@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("kotlinx-serialization")
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
 }
 
 android {
@@ -17,7 +17,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+
         // Add your backend API base URL here
         buildConfigField("String", "API_BASE_URL", "\"https://your-api-domain.com\"")
     }
@@ -51,6 +51,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // Add this line for Material Icons
+    implementation(libs.androidx.material.icons.extended)
 
     // Lifecycle + ViewModel + Navigation Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
