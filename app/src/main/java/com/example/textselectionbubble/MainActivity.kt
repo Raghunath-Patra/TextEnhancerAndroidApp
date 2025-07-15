@@ -371,3 +371,26 @@ class MainActivity : ComponentActivity() {
         Toast.makeText(this, "Text Selection Service Stopped", Toast.LENGTH_SHORT).show()
     }
 }
+
+//// 1. MainActivity.kt
+//package com.example.textselectionbubble
+//
+//import android.os.Bundle
+//import androidx.activity.ComponentActivity
+//import androidx.activity.compose.setContent
+//import androidx.navigation.compose.rememberNavController
+//import com.example.textselectionbubble.ui.navigation.AppNavHost
+//import com.example.textselectionbubble.ui.theme.TextSelectionBubbleTheme
+//
+//class MainActivity : ComponentActivity() {
+//    override fun onCreate(savedInstanceState: Bundle?) {
+//        super.onCreate(savedInstanceState)
+//        setContent {
+//            TextSelectionBubbleTheme {
+//                val navController = rememberNavController()
+//                AppNavHost(navController = navController)
+//            }
+//        }
+//    }
+//}
+
