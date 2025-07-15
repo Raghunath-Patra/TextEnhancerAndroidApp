@@ -1,3 +1,4 @@
+// TextSelectionService.kt
 package com.example.textselectionbubble
 
 import android.accessibilityservice.AccessibilityService
@@ -20,7 +21,14 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import com.example.textselectionbubble.data.UserSessionManager
+import com.example.textselectionbubble.data.models.EnhancementType
+import com.example.textselectionbubble.data.network.ApiResult
+import com.example.textselectionbubble.data.network.NetworkModule
+import com.example.textselectionbubble.data.repository.TextEnhancementRepository
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 class TextSelectionService : AccessibilityService() {
 
@@ -42,6 +50,11 @@ class TextSelectionService : AccessibilityService() {
     private var bubbleX = 100
     private var bubbleY = 200
 
+    // API integration
+    private lateinit var sessionManager: UserSessionManager
+    private lateinit var textEnhancementRepository: TextEnhancementRepository
+    private var isEnhancing = false
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "Service Connected")
@@ -55,6 +68,10 @@ class TextSelectionService : AccessibilityService() {
 
         serviceInfo = info
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+        // Initialize API components
+        sessionManager = UserSessionManager(applicationContext)
+        textEnhancementRepository = TextEnhancementRepository(NetworkModule.apiService)
 
         // Save service state to SharedPreferences
         val sharedPrefs = getSharedPreferences("TextSelectionBubble", Context.MODE_PRIVATE)
@@ -151,22 +168,90 @@ class TextSelectionService : AccessibilityService() {
         val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
 
         selectedTextView.text = "Selected: $selectedText"
+        transformedTextView.text = "Tap enhance to improve text..."
 
-        val transformedText = transformText(selectedText)
-        transformedTextView.text = "Transformed: $transformedText"
+        // Initially disable buttons until text is enhanced
+        copyButton.isEnabled = false
+        replaceButton.isEnabled = false
+
+        var enhancedText = ""
+
+        // Enhance text automatically
+        serviceScope.launch {
+            try {
+                val accessToken = sessionManager.getAccessToken().first()
+                
+                if (accessToken == null) {
+                    transformedTextView.text = "Please log in to enhance text"
+                    return@launch
+                }
+
+                isEnhancing = true
+                transformedTextView.text = "Enhancing..."
+
+                when (val result = textEnhancementRepository.enhanceText(
+                    accessToken, 
+                    selectedText, 
+                    EnhancementType.GENERAL
+                )) {
+                    is ApiResult.Success -> {
+                        enhancedText = result.data.enhancedText
+                        transformedTextView.text = "Enhanced: $enhancedText"
+                        
+                        // Enable buttons
+                        copyButton.isEnabled = true
+                        replaceButton.isEnabled = true
+
+                        // Update user token usage in session
+                        sessionManager.updateUserUsage(
+                            tokensUsedToday = result.data.tokensUsedToday,
+                            tokensRemaining = result.data.tokensRemainingToday,
+                            lastUsageDate = null
+                        )
+                    }
+                    
+                    is ApiResult.Error -> {
+                        transformedTextView.text = "Error: ${result.message}"
+                        
+                        // If it's a token limit error, allow manual enhancement
+                        if (result.message.contains("token limit") || result.message.contains("tokens")) {
+                            enhancedText = transformText(selectedText) // Fallback to simple transform
+                            copyButton.isEnabled = true
+                            replaceButton.isEnabled = true
+                        }
+                    }
+                    
+                    is ApiResult.Loading -> {
+                        // Already handled above
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error enhancing text", e)
+                transformedTextView.text = "Enhancement failed"
+                
+                // Fallback to simple transformation
+                enhancedText = transformText(selectedText)
+                copyButton.isEnabled = true
+                replaceButton.isEnabled = true
+            } finally {
+                isEnhancing = false
+            }
+        }
 
         copyButton.setOnClickListener {
-            copyToClipboard(transformedText)
+            val textToCopy = if (enhancedText.isNotEmpty()) enhancedText else selectedText
+            copyToClipboard(textToCopy)
             Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show()
             hideBubble()
         }
 
         replaceButton.setOnClickListener {
-            if (replaceSelectedText(transformedText)) {
+            val textToReplace = if (enhancedText.isNotEmpty()) enhancedText else selectedText
+            if (replaceSelectedText(textToReplace)) {
                 Toast.makeText(this, "Text replaced", Toast.LENGTH_SHORT).show()
                 hideBubble()
             } else {
-                copyToClipboard(transformedText)
+                copyToClipboard(textToReplace)
                 Toast.makeText(this, "Copied to clipboard - paste to replace", Toast.LENGTH_SHORT).show()
                 hideBubble()
             }
@@ -275,12 +360,13 @@ class TextSelectionService : AccessibilityService() {
     }
 
     private fun transformText(text: String): String {
-        return text.replaceFirstChar { it.uppercase() } + " (Professional)"
+        // Fallback transformation when API is not available
+        return text.replaceFirstChar { it.uppercase() } + " (Enhanced)"
     }
 
     private fun copyToClipboard(text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("transformed_text", text)
+        val clip = ClipData.newPlainText("enhanced_text", text)
         clipboard.setPrimaryClip(clip)
     }
 
