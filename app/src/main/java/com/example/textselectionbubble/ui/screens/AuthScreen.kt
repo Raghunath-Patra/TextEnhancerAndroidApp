@@ -153,6 +153,40 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
                 color = MaterialTheme.colorScheme.primary
             )
         }
+
+        // Email Verification Status
+        if (uiState.needsEmailVerification) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Email Verification Required",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "We've sent a verification link to your email. Please click the link to activate your account, then return here to sign in.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(
+                        onClick = { viewModel.resendVerificationEmail() },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Text("Resend Verification Email")
+                    }
+                }
+            }
+        }
         
         // Error Message
         if (uiState.errorMessage.isNotEmpty()) {

@@ -19,7 +19,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Add your backend API base URL here
-        buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
     }
 
     buildTypes {

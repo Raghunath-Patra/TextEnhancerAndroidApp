@@ -21,13 +21,15 @@ data class SignInResponse(
     val user: User
 )
 
+// Updated SignUpResponse to match backend response
 data class SignUpResponse(
     val message: String,
     val user: UserBasic,
-    val accessToken: String? = null,
-    val refreshToken: String? = null,
+    @SerializedName("access_token") val accessToken: String? = null,
+    @SerializedName("refresh_token") val refreshToken: String? = null,
     val requiresEmailVerification: Boolean? = null
 )
+
 
 data class User(
     val id: String,

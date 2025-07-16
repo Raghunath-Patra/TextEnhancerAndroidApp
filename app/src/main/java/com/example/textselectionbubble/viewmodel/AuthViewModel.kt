@@ -5,6 +5,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.textselectionbubble.data.UserSessionManager
+import com.example.textselectionbubble.data.models.User
 import com.example.textselectionbubble.data.network.ApiResult
 import com.example.textselectionbubble.data.network.NetworkModule
 import com.example.textselectionbubble.data.repository.AuthRepository
@@ -48,6 +49,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    // viewmodel/AuthViewModel.kt - Complete fix
+
     fun authenticate(onSuccess: () -> Unit) {
         val state = _uiState.value
 
@@ -76,7 +79,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 if (state.isSignUp) {
-                    handleSignUp(state.email, state.password)
+                    handleSignUp(state.email, state.password, onSuccess) // ✅ Now includes onSuccess
                 } else {
                     handleSignIn(state.email, state.password, onSuccess)
                 }
@@ -85,6 +88,67 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     errorMessage = "An unexpected error occurred: ${e.localizedMessage}"
                 )
+            }
+        }
+    }
+
+    private suspend fun handleSignUp(email: String, password: String, onSuccess: () -> Unit) {
+        when (val result = authRepository.signUp(email, password)) {
+            is ApiResult.Success -> {
+                // Check if the response indicates email verification is needed
+                if (result.data.message.contains("check your email", ignoreCase = true) ||
+                    result.data.requiresEmailVerification == true ||
+                    result.data.accessToken == null) {
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Please check your email and click the confirmation link to complete registration. Then try signing in.",
+                        isSignUp = false, // Switch back to sign-in mode
+                        password = "", // Clear password for security
+                        needsEmailVerification = true
+                    )
+                } else {
+                    // Email verification not required or already verified
+                    if (result.data.accessToken != null && result.data.refreshToken != null) {
+                        sessionManager.saveUserSession(
+                            accessToken = result.data.accessToken,
+                            refreshToken = result.data.refreshToken,
+                            user = User(
+                                id = result.data.user.id,
+                                email = result.data.user.email,
+                                tokensUsedToday = 0,
+                                dailyTokenLimit = 1000, // Default for free plan
+                                planName = "free",
+                                lastUsageDate = null
+                            )
+                        )
+
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isSuccess = true
+                        )
+
+                        onSuccess() // ✅ Now properly called when signup is successful
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = result.data.message,
+                            isSignUp = false,
+                            password = ""
+                        )
+                    }
+                }
+            }
+
+            is ApiResult.Error -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = result.message
+                )
+            }
+
+            is ApiResult.Loading -> {
+                // Already handled above
             }
         }
     }
@@ -104,47 +168,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
                 onSuccess()
-            }
-
-            is ApiResult.Error -> {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = result.message
-                )
-            }
-
-            is ApiResult.Loading -> {
-                // Already handled above
-            }
-        }
-    }
-
-    private suspend fun handleSignUp(email: String, password: String) {
-        when (val result = authRepository.signUp(email, password)) {
-            is ApiResult.Success -> {
-                // Check if email verification is required
-                if (result.data.requiresEmailVerification == true) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = "Please check your email and click the confirmation link to complete registration. Then try signing in.",
-                        isSignUp = false, // Switch back to sign-in mode
-                        password = ""
-                    )
-                } else {
-                    // Normal signup completion
-                    sessionManager.saveUserSession(
-                        accessToken = result.data.accessToken,
-                        refreshToken = result.data.refreshToken,
-                        user = result.data.user
-                    )
-
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isSuccess = true
-                    )
-
-                    onSuccess()
-                }
             }
 
             is ApiResult.Error -> {

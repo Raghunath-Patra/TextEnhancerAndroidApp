@@ -9,7 +9,7 @@ object ApiConfig {
     // For production:
     // const val BASE_URL = "https://your-domain.com/"
     
-    const val BASE_URL = "https://enhance-backend.vercel.app/"
+    const val BASE_URL = "https://enhance-backend.vercel.app/api/"
     
     // Add timeout configurations
     const val CONNECT_TIMEOUT = 30L
