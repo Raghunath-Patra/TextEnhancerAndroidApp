@@ -23,7 +23,10 @@ data class SignInResponse(
 
 data class SignUpResponse(
     val message: String,
-    val user: UserBasic
+    val user: UserBasic,
+    val accessToken: String? = null,
+    val refreshToken: String? = null,
+    val requiresEmailVerification: Boolean? = null
 )
 
 data class User(
@@ -37,7 +40,8 @@ data class User(
 
 data class UserBasic(
     val id: String,
-    val email: String
+    val email: String,
+    @SerializedName("email_confirmed") val emailConfirmed: Boolean = false
 )
 
 // Text Enhancement Request/Response Models
@@ -70,6 +74,50 @@ data class TokenLimitErrorResponse(
     val plan: String?,
     @SerializedName("resets_at") val resetsAt: String?,
     @SerializedName("tokens_remaining") val tokensRemaining: Int?
+)
+
+// Additional Request Models
+data class RefreshTokenRequest(
+    @SerializedName("refresh_token") val refreshToken: String
+)
+
+data class ResendVerificationRequest(
+    val email: String
+)
+
+data class ForgotPasswordRequest(
+    val email: String
+)
+
+data class SignOutRequest(
+    @SerializedName("access_token") val accessToken: String
+)
+
+// Additional Response Models
+data class RefreshTokenResponse(
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("refresh_token") val refreshToken: String,
+    val user: User
+)
+
+data class ResendVerificationResponse(
+    val message: String
+)
+
+data class ForgotPasswordResponse(
+    val message: String
+)
+
+data class SignOutResponse(
+    val message: String
+)
+
+data class UserUsageResponse(
+    @SerializedName("tokens_used_today") val tokensUsedToday: Int,
+    @SerializedName("tokens_remaining_today") val tokensRemainingToday: Int,
+    @SerializedName("daily_limit") val dailyLimit: Int,
+    @SerializedName("plan_name") val planName: String,
+    @SerializedName("resets_at") val resetsAt: String
 )
 
 // Enhancement Types Enum

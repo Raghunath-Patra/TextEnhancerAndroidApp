@@ -1,3 +1,4 @@
+// viewmodel/AuthViewModel.kt
 package com.example.textselectionbubble.viewmodel
 
 import android.app.Application
@@ -22,7 +23,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val isSignUp: Boolean = false,
         val isLoading: Boolean = false,
         val errorMessage: String = "",
-        val isSuccess: Boolean = false
+        val isSuccess: Boolean = false,
+        val needsEmailVerification: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -41,7 +43,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             isSignUp = !_uiState.value.isSignUp,
             errorMessage = "",
             email = "",
-            password = ""
+            password = "",
+            needsEmailVerification = false
         )
     }
 
@@ -73,7 +76,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 if (state.isSignUp) {
-                    handleSignUp(state.email, state.password, onSuccess)
+                    handleSignUp(state.email, state.password)
                 } else {
                     handleSignIn(state.email, state.password, onSuccess)
                 }
@@ -116,16 +119,32 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun handleSignUp(email: String, password: String, onSuccess: () -> Unit) {
+    private suspend fun handleSignUp(email: String, password: String) {
         when (val result = authRepository.signUp(email, password)) {
             is ApiResult.Success -> {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isSuccess = true,
-                    errorMessage = "Account created successfully! Please sign in.",
-                    isSignUp = false,
-                    password = ""
-                )
+                // Check if email verification is required
+                if (result.data.requiresEmailVerification == true) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Please check your email and click the confirmation link to complete registration. Then try signing in.",
+                        isSignUp = false, // Switch back to sign-in mode
+                        password = ""
+                    )
+                } else {
+                    // Normal signup completion
+                    sessionManager.saveUserSession(
+                        accessToken = result.data.accessToken,
+                        refreshToken = result.data.refreshToken,
+                        user = result.data.user
+                    )
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSuccess = true
+                    )
+
+                    onSuccess()
+                }
             }
 
             is ApiResult.Error -> {
@@ -143,5 +162,85 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = "")
+    }
+
+    fun resendVerificationEmail() {
+        val currentEmail = _uiState.value.email
+
+        if (currentEmail.isEmpty()) {
+            _uiState.value = _uiState.value.copy(errorMessage = "Email is required")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
+
+        viewModelScope.launch {
+            try {
+                when (val result = authRepository.resendVerificationEmail(currentEmail)) {
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = result.data.message
+                        )
+                    }
+
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = result.message
+                        )
+                    }
+
+                    is ApiResult.Loading -> {
+                        // Already handled above
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Failed to resend verification email: ${e.localizedMessage}"
+                )
+            }
+        }
+    }
+
+    fun forgotPassword() {
+        val currentEmail = _uiState.value.email
+
+        if (currentEmail.isEmpty()) {
+            _uiState.value = _uiState.value.copy(errorMessage = "Email is required")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
+
+        viewModelScope.launch {
+            try {
+                when (val result = authRepository.forgotPassword(currentEmail)) {
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = result.data.message
+                        )
+                    }
+
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = result.message
+                        )
+                    }
+
+                    is ApiResult.Loading -> {
+                        // Already handled above
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Failed to send reset email: ${e.localizedMessage}"
+                )
+            }
+        }
     }
 }

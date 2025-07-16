@@ -6,16 +6,40 @@ import retrofit2.Response
 import retrofit2.http.*
 
 interface ApiService {
-    
-    @POST("api/auth/signin")
+
+    // Authentication endpoints
+    @POST("auth/signin")
     suspend fun signIn(@Body request: SignInRequest): Response<SignInResponse>
-    
-    @POST("api/auth/signup")
+
+    @POST("auth/signup")
     suspend fun signUp(@Body request: SignUpRequest): Response<SignUpResponse>
-    
-    @POST("api/enhance-text")
+
+    @POST("auth/refresh")
+    suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>
+
+    @POST("auth/resend-verification")
+    suspend fun resendVerificationEmail(@Body request: ResendVerificationRequest): Response<ResendVerificationResponse>
+
+    @POST("auth/forgot-password")
+    suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ForgotPasswordResponse>
+
+    @POST("auth/signout")
+    suspend fun signOut(@Body request: SignOutRequest): Response<SignOutResponse>
+
+    // Text enhancement endpoints
+    @POST("enhance")
     suspend fun enhanceText(
         @Header("Authorization") authorization: String,
         @Body request: EnhanceTextRequest
     ): Response<EnhanceTextResponse>
+
+    @GET("user/usage")
+    suspend fun getUserUsage(
+        @Header("Authorization") authorization: String
+    ): Response<UserUsageResponse>
+
+    @GET("user/profile")
+    suspend fun getUserProfile(
+        @Header("Authorization") authorization: String
+    ): Response<User>
 }

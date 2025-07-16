@@ -54,6 +54,7 @@ class TextSelectionService : AccessibilityService() {
     private lateinit var sessionManager: UserSessionManager
     private lateinit var textEnhancementRepository: TextEnhancementRepository
     private var isEnhancing = false
+    private var enhancedText = ""
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -105,7 +106,7 @@ class TextSelectionService : AccessibilityService() {
                 selectedNode = event.source
                 Log.d(TAG, "Valid selection detected: $selectedText")
 
-                // Show bubble after delay
+                // Show bubble after delay (but don't enhance automatically)
                 scheduleShowBubble()
             } else {
                 Log.d(TAG, "No valid selection, hiding bubble")
@@ -163,78 +164,92 @@ class TextSelectionService : AccessibilityService() {
 
         val selectedTextView = currentBubbleView.findViewById<TextView>(R.id.tvSelectedText)
         val transformedTextView = currentBubbleView.findViewById<TextView>(R.id.tvTransformedText)
+        val enhanceButton = currentBubbleView.findViewById<Button>(R.id.btnEnhance)
         val copyButton = currentBubbleView.findViewById<Button>(R.id.btnCopy)
         val replaceButton = currentBubbleView.findViewById<Button>(R.id.btnReplace)
         val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
 
+        // Initialize UI
         selectedTextView.text = "Selected: $selectedText"
-        transformedTextView.text = "Tap enhance to improve text..."
+        transformedTextView.text = "Click 'Enhance' to improve this text with AI"
 
-        // Initially disable buttons until text is enhanced
+        // Reset enhanced text
+        enhancedText = ""
+
+        // Initially disable copy/replace buttons until text is enhanced
         copyButton.isEnabled = false
         replaceButton.isEnabled = false
+        enhanceButton.isEnabled = true
 
-        var enhancedText = ""
+        // Enhance button click handler
+        enhanceButton.setOnClickListener {
+            if (isEnhancing) return@setOnClickListener
 
-        // Enhance text automatically
-        serviceScope.launch {
-            try {
-                val accessToken = sessionManager.getAccessToken().first()
-                
-                if (accessToken == null) {
-                    transformedTextView.text = "Please log in to enhance text"
-                    return@launch
-                }
+            serviceScope.launch {
+                try {
+                    val accessToken = sessionManager.getAccessToken().first()
 
-                isEnhancing = true
-                transformedTextView.text = "Enhancing..."
-
-                when (val result = textEnhancementRepository.enhanceText(
-                    accessToken, 
-                    selectedText, 
-                    EnhancementType.GENERAL
-                )) {
-                    is ApiResult.Success -> {
-                        enhancedText = result.data.enhancedText
-                        transformedTextView.text = "Enhanced: $enhancedText"
-                        
-                        // Enable buttons
-                        copyButton.isEnabled = true
-                        replaceButton.isEnabled = true
-
-                        // Update user token usage in session
-                        sessionManager.updateUserUsage(
-                            tokensUsedToday = result.data.tokensUsedToday,
-                            tokensRemaining = result.data.tokensRemainingToday,
-                            lastUsageDate = null
-                        )
+                    if (accessToken == null) {
+                        transformedTextView.text = "Please log in to enhance text"
+                        return@launch
                     }
-                    
-                    is ApiResult.Error -> {
-                        transformedTextView.text = "Error: ${result.message}"
-                        
-                        // If it's a token limit error, allow manual enhancement
-                        if (result.message.contains("token limit") || result.message.contains("tokens")) {
-                            enhancedText = transformText(selectedText) // Fallback to simple transform
+
+                    isEnhancing = true
+                    enhanceButton.isEnabled = false
+                    transformedTextView.text = "Enhancing..."
+
+                    when (val result = textEnhancementRepository.enhanceText(
+                        accessToken,
+                        selectedText,
+                        EnhancementType.GENERAL
+                    )) {
+                        is ApiResult.Success -> {
+                            enhancedText = result.data.enhancedText
+                            transformedTextView.text = "Enhanced: $enhancedText"
+
+                            // Enable copy/replace buttons
                             copyButton.isEnabled = true
                             replaceButton.isEnabled = true
+
+                            // Update user token usage in session
+                            sessionManager.updateUserUsage(
+                                tokensUsedToday = result.data.tokensUsedToday,
+                                tokensRemaining = result.data.tokensRemainingToday,
+                                lastUsageDate = null
+                            )
+
+                            Toast.makeText(this@TextSelectionService, "Text enhanced successfully!", Toast.LENGTH_SHORT).show()
+                        }
+
+                        is ApiResult.Error -> {
+                            transformedTextView.text = "Error: ${result.message}"
+
+                            // If it's a token limit error, allow manual enhancement
+                            if (result.message.contains("token limit") || result.message.contains("tokens")) {
+                                enhancedText = transformText(selectedText) // Fallback to simple transform
+                                transformedTextView.text = "Enhanced (fallback): $enhancedText"
+                                copyButton.isEnabled = true
+                                replaceButton.isEnabled = true
+                            }
+                        }
+
+                        is ApiResult.Loading -> {
+                            // Already handled above
                         }
                     }
-                    
-                    is ApiResult.Loading -> {
-                        // Already handled above
-                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error enhancing text", e)
+                    transformedTextView.text = "Enhancement failed"
+
+                    // Fallback to simple transformation
+                    enhancedText = transformText(selectedText)
+                    transformedTextView.text = "Enhanced (fallback): $enhancedText"
+                    copyButton.isEnabled = true
+                    replaceButton.isEnabled = true
+                } finally {
+                    isEnhancing = false
+                    enhanceButton.isEnabled = true
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error enhancing text", e)
-                transformedTextView.text = "Enhancement failed"
-                
-                // Fallback to simple transformation
-                enhancedText = transformText(selectedText)
-                copyButton.isEnabled = true
-                replaceButton.isEnabled = true
-            } finally {
-                isEnhancing = false
             }
         }
 
