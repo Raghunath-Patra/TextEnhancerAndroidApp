@@ -1,7 +1,6 @@
 // data/network/NetworkModule.kt
 package com.example.textselectionbubble.data.network
 
-import com.example.textselectionbubble.BuildConfig
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
@@ -17,22 +16,18 @@ object NetworkModule {
         .create()
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = if (BuildConfig.DEBUG) {
-            HttpLoggingInterceptor.Level.BODY
-        } else {
-            HttpLoggingInterceptor.Level.NONE
-        }
+        level = HttpLoggingInterceptor.Level.BODY
     }
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(ApiConfig.CONNECT_TIMEOUT, TimeUnit.SECONDS)
+        .readTimeout(ApiConfig.READ_TIMEOUT, TimeUnit.SECONDS)
+        .writeTimeout(ApiConfig.WRITE_TIMEOUT, TimeUnit.SECONDS)
         .build()
 
     private val retrofit = Retrofit.Builder()
-        .baseUrl(BuildConfig.API_BASE_URL)
+        .baseUrl(ApiConfig.BASE_URL)
         .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()

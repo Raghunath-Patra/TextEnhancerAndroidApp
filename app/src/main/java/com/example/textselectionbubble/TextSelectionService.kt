@@ -685,4 +685,15 @@ class TextSelectionService : AccessibilityService() {
         isServiceRunning = true
         sharedPrefs.edit().putBoolean(KEY_SERVICE_RUNNING, true).apply()
     }
+
+    override fun onInterrupt() {
+        Log.d(TAG, "Service Interrupted")
+
+        // Clean up when service is interrupted
+        cancelPendingBubble()
+        hideBubble()
+
+        // Optionally show a brief message
+        // Toast.makeText(this, "Text selection service interrupted", Toast.LENGTH_SHORT).show()
+    }
 }

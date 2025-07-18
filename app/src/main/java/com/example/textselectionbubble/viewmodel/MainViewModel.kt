@@ -40,7 +40,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val enhancementType: EnhancementType = EnhancementType.GENERAL,
         val tokensUsedThisRequest: Int = 0,
         val showEnhancementResult: Boolean = false,
-        val isServiceRunning: Boolean = false
+        val isServiceRunning: Boolean = false,
+        val isMonitoringEnabled: Boolean = false  // Add this line
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -51,6 +52,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadServiceState()
         // Refresh service state when app starts
         refreshServiceState()
+    }
+
+    fun refreshServiceState() {
+        val isServiceActive = sharedPrefs.getBoolean("service_active", false)
+        val isMonitoringEnabled = sharedPrefs.getBoolean("monitoring_enabled", false)
+
+        _uiState.value = _uiState.value.copy(
+            isServiceRunning = isServiceActive,
+            isMonitoringEnabled = isMonitoringEnabled
+        )
     }
 
     private fun loadUserData() {
@@ -221,3 +232,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             sessionManager.clearSession()
         }
     }
+}

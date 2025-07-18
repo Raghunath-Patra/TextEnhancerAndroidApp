@@ -17,27 +17,32 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Add your backend API base URL here
-        buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
     }
 
     buildTypes {
+        debug {
+            isMinifyEnabled = false
+            buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -45,46 +50,43 @@ android {
 }
 
 dependencies {
-    // Compose core + Material3
+    // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
+
+    // Compose core
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-
-    // Add this line for Material Icons
     implementation(libs.androidx.material.icons.extended)
 
-    // Lifecycle + ViewModel + Navigation Compose
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    // Activity and Navigation
+    implementation(libs.androidx.activity.compose)
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Activity Compose
-    implementation(libs.androidx.activity.compose)
+    // Lifecycle and ViewModel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    // Kotlin Coroutines
+    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // Traditional Views (used in overlay service if any)
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.9.0")
-
-    // Network - Retrofit + OkHttp + Kotlinx Serialization
+    // Network
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
-
-    // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // DataStore for secure storage
+    // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // Traditional Views (for overlay)
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.cardview:cardview:1.0.0")
-    implementation("com.google.android.material:material:1.10.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("com.google.android.material:material:1.10.0")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -93,19 +95,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-}
-android {
-    buildFeatures {
-        buildConfig = true
-    }
-
-    // Add build config fields
-    buildTypes {
-        debug {
-            buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
-        }
-        release {
-            buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
-        }
-    }
 }
