@@ -1,4 +1,4 @@
-// ui/screens/MainScreen.kt (Updated with connectivity)
+// ui/screens/MainScreen.kt - Updated with better service control
 package com.example.textselectionbubble.ui.screens
 
 import android.content.Context
@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -57,6 +58,16 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
     LaunchedEffect(Unit) {
         hasOverlayPermission = checkOverlayPermission(context)
         hasAccessibilityPermission = checkAccessibilityPermission(context)
+
+        // Refresh service state when screen loads
+        viewModel.refreshServiceState()
+    }
+
+    // Refresh service state when returning to app
+    LaunchedEffect(hasAccessibilityPermission) {
+        if (hasAccessibilityPermission) {
+            viewModel.refreshServiceState()
+        }
     }
 
     // Show no internet dialog when trying to enhance without connection
@@ -377,17 +388,30 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Service Control Section
+            // Service Control Section - SIMPLIFIED
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Text Selection Service",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Column {
+                    Text(
+                        text = "Text Selection Service",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (uiState.isServiceRunning)
+                            "✅ Active - Works even when app is closed"
+                        else
+                            "❌ Stopped - Enable from accessibility settings or tap Start",
+                        fontSize = 12.sp,
+                        color = if (uiState.isServiceRunning)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error
+                    )
+                }
 
                 TextButton(
                     onClick = { showPermissionSection = !showPermissionSection }
@@ -474,30 +498,33 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
 
             val allPermissionsGranted = hasOverlayPermission && hasAccessibilityPermission
 
+            // Simplified Service Control - Just Start/Stop
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
-                    onClick = { viewModel.startService() },
-                    modifier = Modifier.weight(1f),
-                    enabled = allPermissionsGranted
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Start Service")
-                }
-
-                Button(
-                    onClick = { viewModel.stopService() },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Default.Stop, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Stop Service")
+                if (!uiState.isServiceRunning) {
+                    Button(
+                        onClick = { viewModel.startService() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = allPermissionsGranted
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Start Service")
+                    }
+                } else {
+                    Button(
+                        onClick = { viewModel.stopService() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Stop, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Stop Service")
+                    }
                 }
             }
 
@@ -514,7 +541,7 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Service Info Card
+            // Simplified Service Info Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -525,12 +552,34 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "How it works:",
-                        fontWeight = FontWeight.Medium
+                        text = "Privacy & How it Works:",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "1. Enable permissions above\n2. Start the service\n3. Select text in any app\n4. Use the bubble to enhance text",
+                        text = "• Service runs independently of the app\n" +
+                                "• Works even when app is closed or killed\n" +
+                                "• Only monitors when you select text\n" +
+                                "• Can be controlled from accessibility settings\n" +
+                                "• Turn off service completely when not needed",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Usage:",
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "1. Enable permissions and start service\n" +
+                                "2. Service runs in background (shows notification)\n" +
+                                "3. Select text in any app to see enhancement bubble\n" +
+                                "4. Service works even if you close this app\n" +
+                                "5. Stop service when done to save battery",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -563,7 +612,7 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
     }
 }
 
-// Helper functions
+// Helper functions remain the same
 private fun checkOverlayPermission(context: Context): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         Settings.canDrawOverlays(context)

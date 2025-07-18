@@ -13,4 +13,5 @@
     <string name="enhancement_casual">Casual</string>
     <string name="enhancement_brief">Brief</string>
     <string name="enhancement_detailed">Detailed</string>
+    <string name="accessibility_service_description">Text Selection Enhancement Service - Shows enhancement bubble when you select text. Only monitors text selection events.</string>
 </resources>
