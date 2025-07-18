@@ -60,15 +60,19 @@ class TextSelectionService : AccessibilityService() {
     // Enhancement type buttons
     private var enhancementButtons: List<Button> = emptyList()
 
+    // Also fix the service connection
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "Service Connected")
 
+        // Configure service info
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
+            eventTypes = AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED or
+                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             notificationTimeout = 100
-            flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
         }
 
         serviceInfo = info
@@ -78,46 +82,131 @@ class TextSelectionService : AccessibilityService() {
         sessionManager = UserSessionManager(applicationContext)
         textEnhancementRepository = TextEnhancementRepository(NetworkModule.apiService)
 
-        // Save service state to SharedPreferences
+        // Save service state
         val sharedPrefs = getSharedPreferences("TextSelectionBubble", Context.MODE_PRIVATE)
         sharedPrefs.edit().putBoolean("service_running", true).apply()
+
+        Log.d(TAG, "Service setup complete")
     }
 
+    // Key fixes for TextSelectionService.kt
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
-            Log.d(TAG, "Text selection changed")
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED -> {
+                Log.d(TAG, "Text selection changed - From: ${event.fromIndex}, To: ${event.toIndex}")
 
-            // Cancel any pending bubble show
-            cancelPendingBubble()
+                // Cancel any pending bubble show
+                cancelPendingBubble()
 
-            val newSelectedText = getSelectedText(event)
+                // Get the source node
+                val sourceNode = event.source
+                if (sourceNode == null) {
+                    Log.d(TAG, "Source node is null")
+                    hideBubble()
+                    return
+                }
 
-            // Store selection indices for replacement
-            selectionStart = event.fromIndex
-            selectionEnd = event.toIndex
+                // Store the node reference
+                selectedNode = sourceNode
 
-            Log.d(TAG, "New selected text: '$newSelectedText'")
-            Log.d(TAG, "From index: ${event.fromIndex}, To index: ${event.toIndex}")
+                // Get the selected text
+                val newSelectedText = extractSelectedText(sourceNode, event.fromIndex, event.toIndex)
 
-            val hasValidSelection = event.fromIndex >= 0 &&
-                    event.toIndex > event.fromIndex &&
-                    newSelectedText != null &&
-                    newSelectedText.trim().isNotEmpty() &&
-                    newSelectedText.trim().length > 1
+                Log.d(TAG, "Extracted text: '$newSelectedText'")
 
-            if (hasValidSelection) {
-                selectedText = newSelectedText!!.trim()
-                selectedNode = event.source
-                Log.d(TAG, "Valid selection detected: $selectedText")
+                // Validate selection
+                val hasValidSelection = newSelectedText != null &&
+                        newSelectedText.trim().isNotEmpty() &&
+                        newSelectedText.trim().length > 1 &&
+                        event.fromIndex >= 0 &&
+                        event.toIndex > event.fromIndex
 
-                // Show bubble after delay
-                scheduleShowBubble()
-            } else {
-                Log.d(TAG, "No valid selection, hiding bubble")
-                hideBubble()
+                if (hasValidSelection) {
+                    selectedText = newSelectedText!!.trim()
+                    selectionStart = event.fromIndex
+                    selectionEnd = event.toIndex
+
+                    Log.d(TAG, "Valid selection: '$selectedText' (${selectionStart}-${selectionEnd})")
+
+                    // Show bubble after delay to avoid flickering
+                    scheduleShowBubble()
+                } else {
+                    Log.d(TAG, "Invalid selection, hiding bubble")
+                    hideBubble()
+                }
+            }
+
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                // Window content changed, might need to update
+                Log.d(TAG, "Window content changed")
             }
         }
     }
+
+    private fun extractSelectedText(node: AccessibilityNodeInfo, fromIndex: Int, toIndex: Int): String? {
+        return try {
+            // Method 1: Try to get text from the node directly
+            val nodeText = node.text
+            if (nodeText != null && fromIndex >= 0 && toIndex > fromIndex &&
+                fromIndex < nodeText.length && toIndex <= nodeText.length) {
+
+                val selectedText = nodeText.subSequence(fromIndex, toIndex).toString()
+                Log.d(TAG, "Method 1 - Direct extraction: '$selectedText'")
+                return selectedText
+            }
+
+            // Method 2: Try to get text from clipboard (some apps copy selection automatically)
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData = clipboard.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val clipText = clipData.getItemAt(0).text?.toString()
+                if (clipText != null && clipText.trim().isNotEmpty()) {
+                    Log.d(TAG, "Method 2 - Clipboard: '$clipText'")
+                    return clipText
+                }
+            }
+
+            // Method 3: Try to traverse child nodes
+            return traverseForSelectedText(node)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error extracting selected text", e)
+            null
+        }
+    }
+
+    private fun traverseForSelectedText(node: AccessibilityNodeInfo): String? {
+        try {
+            // Check if this node has selected text
+            if (node.text != null && node.text.isNotEmpty()) {
+                val text = node.text.toString()
+                Log.d(TAG, "Found text in node: '$text'")
+                return text
+            }
+
+            // Recursively check child nodes
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i)
+                if (child != null) {
+                    val childText = traverseForSelectedText(child)
+                    if (childText != null) {
+                        child.recycle()
+                        return childText
+                    }
+                    child.recycle()
+                }
+            }
+
+            return null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error traversing nodes", e)
+            return null
+        }
+    }
+
+
+
 
     private fun cancelPendingBubble() {
         delayJob?.cancel()

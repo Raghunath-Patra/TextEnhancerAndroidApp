@@ -1,9 +1,87 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
+    <!-- Base application theme -->
     <style name="Theme.TextSelectionBubble" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/enhancement_selected</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSecondary">@color/teal_200</item>
+        <item name="colorError">@color/close_button_color</item>
     </style>
+
+    <!-- Enhancement Type Button Style -->
+    <style name="EnhancementTypeButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:layout_marginEnd">4dp</item>
+        <item name="cornerRadius">16dp</item>
+    </style>
+
+    <!-- Main Action Button Style -->
+    <style name="MainActionButton" parent="Widget.Material3.Button">
+        <item name="android:textSize">11sp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="cornerRadius">8dp</item>
+    </style>
+
+    <!-- Secondary Action Button Style -->
+    <style name="SecondaryActionButton" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:textSize">10sp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="cornerRadius">8dp</item>
+    </style>
+
+    <!-- Close Button Style -->
+    <style name="CloseButton" parent="Widget.Material3.Button">
+        <item name="android:textSize">14sp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:layout_width">40dp</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="backgroundTint">@color/close_button_color</item>
+    </style>
+
+    <!-- Alternative AppCompat styles if you prefer not to use Material3 -->
+    <!--
+    <style name="Theme.TextSelectionBubble" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">@color/enhancement_selected</item>
+        <item name="colorPrimaryDark">@color/enhancement_selected</item>
+        <item name="colorAccent">@color/enhancement_selected</item>
+    </style>
+
+    <style name="EnhancementTypeButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:layout_marginEnd">4dp</item>
+        <item name="android:background">@drawable/enhancement_button_selector</item>
+    </style>
+
+    <style name="MainActionButton" parent="Widget.AppCompat.Button">
+        <item name="android:textSize">11sp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:background">@drawable/enhanced_action_button</item>
+        <item name="android:textColor">@android:color/white</item>
+    </style>
+
+    <style name="SecondaryActionButton" parent="Widget.AppCompat.Button">
+        <item name="android:textSize">10sp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:background">@drawable/disabled_action_button</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <style name="CloseButton" parent="Widget.AppCompat.Button">
+        <item name="android:textSize">14sp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:layout_width">40dp</item>
+        <item name="android:background">@drawable/close_button_background</item>
+        <item name="android:textColor">@android:color/white</item>
+    </style>
+    -->
 </resources>

@@ -94,3 +94,18 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+android {
+    buildFeatures {
+        buildConfig = true
+    }
+
+    // Add build config fields
+    buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
+        }
+        release {
+            buildConfigField("String", "API_BASE_URL", "\"https://enhance-backend.vercel.app/api/\"")
+        }
+    }
+}

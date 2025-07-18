@@ -1,7 +1,12 @@
-// MainActivity.kt
+// MainActivity.kt - Complete with all imports
 package com.example.textselectionbubble
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,8 +18,15 @@ import com.example.textselectionbubble.ui.navigation.AppNavHost
 import com.example.textselectionbubble.ui.theme.TextSelectionBubbleTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val permissionRequestCode = 1001
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Request necessary permissions
+        requestPermissions()
+
         setContent {
             TextSelectionBubbleTheme {
                 Surface(
@@ -27,7 +39,38 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun requestPermissions() {
+        // Request overlay permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                startActivityForResult(intent, permissionRequestCode)
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == permissionRequestCode) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Settings.canDrawOverlays(this)) {
+                    // Permission granted
+                    Log.d("MainActivity", "Overlay permission granted")
+                } else {
+                    // Permission denied
+                    Log.d("MainActivity", "Overlay permission denied")
+                }
+            }
+        }
+    }
 }
+
 //
 //package com.example.textselectionbubble
 //

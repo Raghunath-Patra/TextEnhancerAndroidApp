@@ -1,9 +1,10 @@
 <!-- app/src/main/res/xml/accessibility_service_config.xml -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeViewTextSelectionChanged|typeWindowContentChanged"
+    android:accessibilityEventTypes="typeViewTextSelectionChanged|typeWindowContentChanged|typeViewClicked|typeViewFocused"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagRequestTouchExplorationMode"
     android:canRetrieveWindowContent="true"
     android:description="@string/service_description"
     android:notificationTimeout="100"
-    android:packageNames="" />
+    android:packageNames=""
+    android:settingsActivity="com.example.textselectionbubble.MainActivity" />
