@@ -1,6 +1,7 @@
-// TextSelectionService.kt - Optimized for minimal monitoring
+// TextSelectionService.kt - Fixed to start on demand without persistent notification
 package com.example.textselectionbubble
 
+import android.R.id.closeButton
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ClipData
@@ -11,7 +12,6 @@ import android.content.SharedPreferences
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -39,7 +39,8 @@ class TextSelectionService : AccessibilityService() {
         private const val TAG = "TextSelectionService"
         private const val SELECTION_DELAY_MS = 300L
         private const val PREFS_NAME = "TextSelectionBubble"
-        private const val KEY_SERVICE_RUNNING = "service_running"
+        private const val KEY_MONITORING_ENABLED = "monitoring_enabled"
+        private const val KEY_SERVICE_ACTIVE = "service_active"
     }
 
     private var windowManager: WindowManager? = null
@@ -51,8 +52,6 @@ class TextSelectionService : AccessibilityService() {
     private var delayJob: Job? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    // Simplified service state
-    private var isServiceRunning = false
     private lateinit var sharedPrefs: SharedPreferences
 
     // Position tracking
@@ -76,9 +75,8 @@ class TextSelectionService : AccessibilityService() {
         // Initialize shared preferences
         sharedPrefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Set service as running - this persists even if app is closed
-        isServiceRunning = true
-        sharedPrefs.edit().putBoolean(KEY_SERVICE_RUNNING, true).apply()
+        // Mark service as active (connected to system)
+        sharedPrefs.edit().putBoolean(KEY_SERVICE_ACTIVE, true).apply()
 
         // Initialize other components
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -95,60 +93,23 @@ class TextSelectionService : AccessibilityService() {
         }
         serviceInfo = info
 
-        // Show notification that service is running
-        showServiceNotification()
-
-        Log.d(TAG, "Service configured for text selection monitoring - works independently of app")
-    }
-
-    private fun showServiceNotification() {
-        // Create notification channel for Android 8.0+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
-                "text_selection_service",
-                "Text Selection Service",
-                android.app.NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows when text selection service is running"
-                setSound(null, null)
-                enableVibration(false)
-            }
-
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        // Create notification
-        val notification = androidx.core.app.NotificationCompat.Builder(this, "text_selection_service")
-            .setContentTitle("Text Selection Service Active")
-            .setContentText("Select text in any app to enhance it")
-            .setSmallIcon(R.drawable.ic_notification) // You'll need to add this icon
-            .setOngoing(true)
-            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW)
-            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_SERVICE)
-            .build()
-
-        // Start as foreground service to keep running
-        try {
-            startForeground(1, notification)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start foreground service", e)
-        }
-    }
-
-    private fun hideServiceNotification() {
-        try {
-            stopForeground(true)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to stop foreground service", e)
-        }
+        Log.d(TAG, "Service configured and ready - waiting for text selection events")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        // Only process if monitoring is enabled
+        if (!isMonitoringEnabled()) {
+            return
+        }
+
         // Only process text selection events
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
             handleTextSelectionChanged(event)
         }
+    }
+
+    private fun isMonitoringEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_MONITORING_ENABLED, false)
     }
 
     private fun handleTextSelectionChanged(event: AccessibilityEvent) {
@@ -248,7 +209,7 @@ class TextSelectionService : AccessibilityService() {
         val enhanceButton = currentBubbleView.findViewById<Button>(R.id.btnEnhance)
         val copyButton = currentBubbleView.findViewById<Button>(R.id.btnCopy)
         val replaceButton = currentBubbleView.findViewById<Button>(R.id.btnReplace)
-        val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
+//        val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
 
         // Enhancement type buttons
         val generalButton = currentBubbleView.findViewById<Button>(R.id.btnGeneral)
@@ -336,7 +297,6 @@ class TextSelectionService : AccessibilityService() {
                 Toast.makeText(this, "Copied to clipboard - manual paste needed", Toast.LENGTH_LONG).show()
             }
         }
-
         val closeButton = bubbleView?.findViewById<Button>(R.id.btnClose)
         closeButton?.setOnClickListener { hideBubble() }
     }
@@ -355,7 +315,6 @@ class TextSelectionService : AccessibilityService() {
         }
     }
 
-    // Rest of the methods remain the same...
     private fun setupEnhancementTypeButtons() {
         val enhancementTypes = listOf(
             EnhancementType.GENERAL,
@@ -656,11 +615,10 @@ class TextSelectionService : AccessibilityService() {
         Log.d(TAG, "Service Destroyed")
 
         // Clean up and mark service as stopped
-        isServiceRunning = false
-        sharedPrefs.edit().putBoolean(KEY_SERVICE_RUNNING, false).apply()
-
-        // Hide notification
-        hideServiceNotification()
+        sharedPrefs.edit()
+            .putBoolean(KEY_SERVICE_ACTIVE, false)
+            .putBoolean(KEY_MONITORING_ENABLED, false)
+            .apply()
 
         cancelPendingBubble()
         serviceScope.cancel()
@@ -669,31 +627,20 @@ class TextSelectionService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         Log.d(TAG, "Service Unbound")
-
-        // Keep service running even when app is closed
-        // Only mark as stopped if service is actually being destroyed
-
         return false // Return false to allow rebinding
     }
 
-    // Handle service restart
     override fun onRebind(intent: Intent?) {
         super.onRebind(intent)
         Log.d(TAG, "Service Rebound")
 
-        // Service was restarted, ensure it's marked as running
-        isServiceRunning = true
-        sharedPrefs.edit().putBoolean(KEY_SERVICE_RUNNING, true).apply()
+        // Service was restarted, ensure it's marked as active
+        sharedPrefs.edit().putBoolean(KEY_SERVICE_ACTIVE, true).apply()
     }
 
     override fun onInterrupt() {
         Log.d(TAG, "Service Interrupted")
-
-        // Clean up when service is interrupted
         cancelPendingBubble()
         hideBubble()
-
-        // Optionally show a brief message
-        // Toast.makeText(this, "Text selection service interrupted", Toast.LENGTH_SHORT).show()
     }
 }

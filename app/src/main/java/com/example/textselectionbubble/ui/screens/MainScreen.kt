@@ -1,4 +1,4 @@
-// ui/screens/MainScreen.kt - Updated with better service control
+// ui/screens/MainScreen.kt - Fixed to properly show permission controls
 package com.example.textselectionbubble.ui.screens
 
 import android.content.Context
@@ -13,9 +13,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +35,7 @@ import com.example.textselectionbubble.ui.components.ConnectivityIndicator
 import com.example.textselectionbubble.ui.components.NoInternetDialog
 import com.example.textselectionbubble.ui.components.rememberConnectivityState
 import com.example.textselectionbubble.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +47,7 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
 
     var textToEnhance by remember { mutableStateOf("") }
     var selectedEnhancementType by remember { mutableStateOf(EnhancementType.GENERAL) }
-    var showPermissionSection by remember { mutableStateOf(false) }
+    var showPermissionDetails by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
 
     // Check permissions
@@ -56,18 +57,15 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
     val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
+        // Check permissions when screen loads
         hasOverlayPermission = checkOverlayPermission(context)
         hasAccessibilityPermission = checkAccessibilityPermission(context)
-
-        // Refresh service state when screen loads
         viewModel.refreshServiceState()
     }
 
-    // Refresh service state when returning to app
-    LaunchedEffect(hasAccessibilityPermission) {
-        if (hasAccessibilityPermission) {
-            viewModel.refreshServiceState()
-        }
+    // Refresh permissions when user returns from settings
+    LaunchedEffect(hasAccessibilityPermission, hasOverlayPermission) {
+        viewModel.refreshServiceState()
     }
 
     // Show no internet dialog when trying to enhance without connection
@@ -98,7 +96,7 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
             ) {
                 Column {
                     Text(
-                        text = "Welcome Back!",
+                        text = "Text Selection Bubble",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -180,6 +178,212 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Service Status Card - Always visible
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (uiState.isMonitoringEnabled)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Text Selection Service",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (uiState.isMonitoringEnabled)
+                                    "✅ Active - Select text in any app to enhance it"
+                                else
+                                    "❌ Stopped - Enable to use text selection bubble",
+                                fontSize = 12.sp,
+                                color = if (uiState.isMonitoringEnabled)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { showPermissionDetails = !showPermissionDetails }
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Service Control Button
+                    val allPermissionsGranted = hasOverlayPermission && hasAccessibilityPermission
+
+                    if (!uiState.isMonitoringEnabled) {
+                        Button(
+                            onClick = {
+                                if (allPermissionsGranted) {
+                                    viewModel.startService()
+                                } else {
+                                    showPermissionDetails = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = allPermissionsGranted
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (allPermissionsGranted) "Start Service" else "Enable Permissions First")
+                        }
+                    } else {
+                        Button(
+                            onClick = { viewModel.stopService() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(Icons.Default.Stop, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Stop Service")
+                        }
+                    }
+
+                    if (!allPermissionsGranted) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "⚠️ Missing permissions - tap Settings above to enable",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            // Permission Details Section
+            if (showPermissionDetails) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Required Permissions",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Permission Status
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = if (hasAccessibilityPermission) "✅" else "❌",
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = "Accessibility Service - to detect text selection",
+                                fontSize = 14.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = if (hasOverlayPermission) "✅" else "❌",
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = "Display over other apps - to show bubble",
+                                fontSize = 14.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Permission Buttons
+                        if (!hasAccessibilityPermission) {
+                            Button(
+                                onClick = {
+                                    openAccessibilitySettings(context)
+                                    // Refresh permissions after a delay
+                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                        kotlinx.coroutines.delay(1000)
+                                        hasAccessibilityPermission = checkAccessibilityPermission(context)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Enable Accessibility Service")
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        if (!hasOverlayPermission) {
+                            Button(
+                                onClick = {
+                                    requestOverlayPermission(context)
+                                    // Refresh permissions after a delay
+                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                        kotlinx.coroutines.delay(1000)
+                                        hasOverlayPermission = checkOverlayPermission(context)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Enable Overlay Permission")
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        // How it works
+                        Text(
+                            text = "How it works:",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "1. Enable both permissions above\n" +
+                                    "2. Start the service\n" +
+                                    "3. Select text in any app\n" +
+                                    "4. Enhancement bubble appears automatically\n" +
+                                    "5. Service works even when this app is closed",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // Text Enhancement Section
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -187,11 +391,10 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Enhance Text",
-                    fontSize = 20.sp,
+                    text = "Manual Text Enhancement",
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-
                 ConnectivityIndicator()
             }
 
@@ -387,214 +590,6 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-
-            // Service Control Section - SIMPLIFIED
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Text Selection Service",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = if (uiState.isServiceRunning)
-                            "✅ Active - Works even when app is closed"
-                        else
-                            "❌ Stopped - Enable from accessibility settings or tap Start",
-                        fontSize = 12.sp,
-                        color = if (uiState.isServiceRunning)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.error
-                    )
-                }
-
-                TextButton(
-                    onClick = { showPermissionSection = !showPermissionSection }
-                ) {
-                    Text(if (showPermissionSection) "Hide Details" else "Show Details")
-                }
-            }
-
-            if (showPermissionSection) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Permission Status
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if (hasAccessibilityPermission) "✅" else "❌",
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = "Accessibility Service",
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if (hasOverlayPermission) "✅" else "❌",
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = "Display over other apps",
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if (connectivityState.isConnected) "✅" else "❌",
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = "Internet Connection (${connectivityState.connectionType})",
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (!hasAccessibilityPermission) {
-                    Button(
-                        onClick = { openAccessibilitySettings(context) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Enable Accessibility Service")
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                if (!hasOverlayPermission) {
-                    Button(
-                        onClick = { requestOverlayPermission(context) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Enable Overlay Permission")
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-
-            val allPermissionsGranted = hasOverlayPermission && hasAccessibilityPermission
-
-            // Simplified Service Control - Just Start/Stop
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (!uiState.isServiceRunning) {
-                    Button(
-                        onClick = { viewModel.startService() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = allPermissionsGranted
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Start Service")
-                    }
-                } else {
-                    Button(
-                        onClick = { viewModel.stopService() },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(Icons.Default.Stop, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Stop Service")
-                    }
-                }
-            }
-
-            if (!allPermissionsGranted) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "⚠️ Please enable all permissions to use the service",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Simplified Service Info Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Privacy & How it Works:",
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "• Service runs independently of the app\n" +
-                                "• Works even when app is closed or killed\n" +
-                                "• Only monitors when you select text\n" +
-                                "• Can be controlled from accessibility settings\n" +
-                                "• Turn off service completely when not needed",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "Usage:",
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "1. Enable permissions and start service\n" +
-                                "2. Service runs in background (shows notification)\n" +
-                                "3. Select text in any app to see enhancement bubble\n" +
-                                "4. Service works even if you close this app\n" +
-                                "5. Stop service when done to save battery",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    if (!connectivityState.isConnected) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "⚠️ Note: Text enhancement requires internet connection",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
         }
     }
 
@@ -612,7 +607,7 @@ fun MainScreen(navController: NavController, viewModel: MainViewModel = viewMode
     }
 }
 
-// Helper functions remain the same
+// Helper functions
 private fun checkOverlayPermission(context: Context): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         Settings.canDrawOverlays(context)
