@@ -2,4 +2,15 @@
 <resources>
     <string name="app_name">Text Selection Bubble</string>
     <string name="service_description">Detects text selection and shows transformation bubble</string>
+    <string name="minimize">Minimize</string>
+    <string name="enhance_text">Enhance Text</string>
+    <string name="copy_text">Copy</string>
+    <string name="replace_text">Replace</string>
+    <string name="close_bubble">Close</string>
+    <string name="processing">Processing...</string>
+    <string name="enhancement_general">General</string>
+    <string name="enhancement_formal">Formal</string>
+    <string name="enhancement_casual">Casual</string>
+    <string name="enhancement_brief">Brief</string>
+    <string name="enhancement_detailed">Detailed</string>
 </resources>

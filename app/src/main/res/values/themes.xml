@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.TextSelectionBubble" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.TextSelectionBubble" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/enhancement_selected</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">@color/teal_200</item>
+    </style>
 </resources>

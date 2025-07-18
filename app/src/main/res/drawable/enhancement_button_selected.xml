@@ -1,5 +1,5 @@
-<!-- enhancement_button_selected.xml -->
 <?xml version="1.0" encoding="utf-8"?>
+<!-- enhancement_button_selected.xml -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="@color/enhancement_selected" />
     <corners android:radius="16dp" />
