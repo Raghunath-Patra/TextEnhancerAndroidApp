@@ -1,0 +1,6 @@
+<!-- enhancement_button_selector.xml -->
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:drawable="@drawable/enhancement_button_selected" />
+    <item android:drawable="@drawable/enhancement_button_unselected" />
+</selector>

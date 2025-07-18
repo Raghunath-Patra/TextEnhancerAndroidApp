@@ -1,4 +1,3 @@
-// TextSelectionService.kt
 package com.example.textselectionbubble
 
 import android.accessibilityservice.AccessibilityService
@@ -21,7 +20,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
-import androidx.lifecycle.lifecycleScope
+import androidx.core.content.ContextCompat
 import com.example.textselectionbubble.data.UserSessionManager
 import com.example.textselectionbubble.data.models.EnhancementType
 import com.example.textselectionbubble.data.network.ApiResult
@@ -29,6 +28,7 @@ import com.example.textselectionbubble.data.network.NetworkModule
 import com.example.textselectionbubble.data.repository.TextEnhancementRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import kotlin.math.abs
 
 class TextSelectionService : AccessibilityService() {
 
@@ -55,6 +55,10 @@ class TextSelectionService : AccessibilityService() {
     private lateinit var textEnhancementRepository: TextEnhancementRepository
     private var isEnhancing = false
     private var enhancedText = ""
+    private var selectedEnhancementType = EnhancementType.GENERAL
+
+    // Enhancement type buttons
+    private var enhancementButtons: List<Button> = emptyList()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -106,7 +110,7 @@ class TextSelectionService : AccessibilityService() {
                 selectedNode = event.source
                 Log.d(TAG, "Valid selection detected: $selectedText")
 
-                // Show bubble after delay (but don't enhance automatically)
+                // Show bubble after delay
                 scheduleShowBubble()
             } else {
                 Log.d(TAG, "No valid selection, hiding bubble")
@@ -162,6 +166,7 @@ class TextSelectionService : AccessibilityService() {
 
         val currentBubbleView = bubbleView ?: return
 
+        // Initialize UI elements
         val selectedTextView = currentBubbleView.findViewById<TextView>(R.id.tvSelectedText)
         val transformedTextView = currentBubbleView.findViewById<TextView>(R.id.tvTransformedText)
         val enhanceButton = currentBubbleView.findViewById<Button>(R.id.btnEnhance)
@@ -169,106 +174,84 @@ class TextSelectionService : AccessibilityService() {
         val replaceButton = currentBubbleView.findViewById<Button>(R.id.btnReplace)
         val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
 
+        // Enhancement type buttons
+        val generalButton = currentBubbleView.findViewById<Button>(R.id.btnGeneral)
+        val professionalButton = currentBubbleView.findViewById<Button>(R.id.btnProfessional)
+        val casualButton = currentBubbleView.findViewById<Button>(R.id.btnCasual)
+        val conciseButton = currentBubbleView.findViewById<Button>(R.id.btnConcise)
+        val detailedButton = currentBubbleView.findViewById<Button>(R.id.btnDetailed)
+
+        enhancementButtons = listOf(generalButton, professionalButton, casualButton, conciseButton, detailedButton)
+
         // Initialize UI
-        selectedTextView.text = "Selected: $selectedText"
-        transformedTextView.text = "Click 'Enhance' to improve this text with AI"
+        selectedTextView.text = "Selected: ${selectedText.take(50)}${if (selectedText.length > 50) "..." else ""}"
+        transformedTextView.text = "Select enhancement style and tap ✨ to enhance text"
 
         // Reset enhanced text
         enhancedText = ""
+        selectedEnhancementType = EnhancementType.GENERAL
 
         // Initially disable copy/replace buttons until text is enhanced
-        copyButton.isEnabled = false
-        replaceButton.isEnabled = false
+        disableActionButtons(copyButton, replaceButton)
         enhanceButton.isEnabled = true
+
+        // Set up enhancement type selection
+        setupEnhancementTypeButtons()
 
         // Enhance button click handler
         enhanceButton.setOnClickListener {
             if (isEnhancing) return@setOnClickListener
-
-            serviceScope.launch {
-                try {
-                    val accessToken = sessionManager.getAccessToken().first()
-
-                    if (accessToken == null) {
-                        transformedTextView.text = "Please log in to enhance text"
-                        return@launch
-                    }
-
-                    isEnhancing = true
-                    enhanceButton.isEnabled = false
-                    transformedTextView.text = "Enhancing..."
-
-                    when (val result = textEnhancementRepository.enhanceText(
-                        accessToken,
-                        selectedText,
-                        EnhancementType.GENERAL
-                    )) {
-                        is ApiResult.Success -> {
-                            enhancedText = result.data.enhancedText
-                            transformedTextView.text = "Enhanced: $enhancedText"
-
-                            // Enable copy/replace buttons
-                            copyButton.isEnabled = true
-                            replaceButton.isEnabled = true
-
-                            // Update user token usage in session
-                            sessionManager.updateUserUsage(
-                                tokensUsedToday = result.data.tokensUsedToday,
-                                tokensRemaining = result.data.tokensRemainingToday,
-                                lastUsageDate = null
-                            )
-
-                            Toast.makeText(this@TextSelectionService, "Text enhanced successfully!", Toast.LENGTH_SHORT).show()
-                        }
-
-                        is ApiResult.Error -> {
-                            transformedTextView.text = "Error: ${result.message}"
-
-                            // If it's a token limit error, allow manual enhancement
-                            if (result.message.contains("token limit") || result.message.contains("tokens")) {
-                                enhancedText = transformText(selectedText) // Fallback to simple transform
-                                transformedTextView.text = "Enhanced (fallback): $enhancedText"
-                                copyButton.isEnabled = true
-                                replaceButton.isEnabled = true
-                            }
-                        }
-
-                        is ApiResult.Loading -> {
-                            // Already handled above
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error enhancing text", e)
-                    transformedTextView.text = "Enhancement failed"
-
-                    // Fallback to simple transformation
-                    enhancedText = transformText(selectedText)
-                    transformedTextView.text = "Enhanced (fallback): $enhancedText"
-                    copyButton.isEnabled = true
-                    replaceButton.isEnabled = true
-                } finally {
-                    isEnhancing = false
-                    enhanceButton.isEnabled = true
-                }
-            }
+            enhanceText(transformedTextView, copyButton, replaceButton, enhanceButton)
         }
 
         copyButton.setOnClickListener {
             val textToCopy = if (enhancedText.isNotEmpty()) enhancedText else selectedText
             copyToClipboard(textToCopy)
-            Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-            hideBubble()
+
+            // Provide visual feedback
+            val originalText = copyButton.text
+            copyButton.text = "✓"
+            copyButton.setTextColor(ContextCompat.getColor(this, R.color.success_color))
+
+            // Reset after delay
+            serviceScope.launch {
+                delay(1000)
+                copyButton.text = "📋"
+                copyButton.setTextColor(ContextCompat.getColor(this@TextSelectionService, android.R.color.white))
+            }
+
+            Toast.makeText(this, "Copied enhanced text!", Toast.LENGTH_SHORT).show()
         }
 
         replaceButton.setOnClickListener {
             val textToReplace = if (enhancedText.isNotEmpty()) enhancedText else selectedText
+
+            // Provide visual feedback
+            val originalText = replaceButton.text
+            replaceButton.text = "⏳"
+
             if (replaceSelectedText(textToReplace)) {
-                Toast.makeText(this, "Text replaced", Toast.LENGTH_SHORT).show()
-                hideBubble()
+                replaceButton.text = "✓"
+                replaceButton.setTextColor(ContextCompat.getColor(this, R.color.success_color))
+                Toast.makeText(this, "Text replaced successfully!", Toast.LENGTH_SHORT).show()
+
+                // Hide bubble after successful replacement
+                serviceScope.launch {
+                    delay(1000)
+                    hideBubble()
+                }
             } else {
                 copyToClipboard(textToReplace)
-                Toast.makeText(this, "Copied to clipboard - paste to replace", Toast.LENGTH_SHORT).show()
-                hideBubble()
+                replaceButton.text = "📋"
+                replaceButton.setTextColor(ContextCompat.getColor(this, R.color.warning_color))
+                Toast.makeText(this, "Copied to clipboard - manual paste needed", Toast.LENGTH_LONG).show()
+
+                // Reset after delay
+                serviceScope.launch {
+                    delay(2000)
+                    replaceButton.text = "🔄"
+                    replaceButton.setTextColor(ContextCompat.getColor(this@TextSelectionService, android.R.color.white))
+                }
             }
         }
 
@@ -299,6 +282,149 @@ class TextSelectionService : AccessibilityService() {
         }
     }
 
+    private fun setupEnhancementTypeButtons() {
+        val enhancementTypes = listOf(
+            EnhancementType.GENERAL,
+            EnhancementType.PROFESSIONAL,
+            EnhancementType.CASUAL,
+            EnhancementType.CONCISE,
+            EnhancementType.DETAILED
+        )
+
+        enhancementButtons.forEachIndexed { index, button ->
+            val enhancementType = enhancementTypes[index]
+
+            button.setOnClickListener {
+                selectedEnhancementType = enhancementType
+                updateEnhancementButtonStates()
+            }
+        }
+
+        // Set initial state
+        updateEnhancementButtonStates()
+    }
+
+    private fun updateEnhancementButtonStates() {
+        val enhancementTypes = listOf(
+            EnhancementType.GENERAL,
+            EnhancementType.PROFESSIONAL,
+            EnhancementType.CASUAL,
+            EnhancementType.CONCISE,
+            EnhancementType.DETAILED
+        )
+
+        enhancementButtons.forEachIndexed { index, button ->
+            val isSelected = enhancementTypes[index] == selectedEnhancementType
+
+            button.isSelected = isSelected
+
+            if (isSelected) {
+                button.setBackgroundResource(R.drawable.enhancement_button_selected)
+                button.setTextColor(ContextCompat.getColor(this, android.R.color.white))
+            } else {
+                button.setBackgroundResource(R.drawable.enhancement_button_unselected)
+                button.setTextColor(ContextCompat.getColor(this, R.color.enhancement_selected))
+            }
+        }
+    }
+
+    private fun enableActionButtons(copyButton: Button, replaceButton: Button) {
+        copyButton.isEnabled = true
+        replaceButton.isEnabled = true
+        copyButton.setBackgroundResource(R.drawable.enhanced_action_button)
+        replaceButton.setBackgroundResource(R.drawable.enhanced_action_button)
+        copyButton.setTextColor(ContextCompat.getColor(this, android.R.color.white))
+        replaceButton.setTextColor(ContextCompat.getColor(this, android.R.color.white))
+    }
+
+    private fun disableActionButtons(copyButton: Button, replaceButton: Button) {
+        copyButton.isEnabled = false
+        replaceButton.isEnabled = false
+        copyButton.setBackgroundResource(R.drawable.disabled_action_button)
+        replaceButton.setBackgroundResource(R.drawable.disabled_action_button)
+        copyButton.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        replaceButton.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+    }
+
+    private fun enhanceText(
+        transformedTextView: TextView,
+        copyButton: Button,
+        replaceButton: Button,
+        enhanceButton: Button
+    ) {
+        serviceScope.launch {
+            try {
+                val accessToken = sessionManager.getAccessToken().first()
+
+                if (accessToken == null) {
+                    transformedTextView.text = "Please log in to enhance text"
+                    return@launch
+                }
+
+                isEnhancing = true
+                enhanceButton.isEnabled = false
+                enhanceButton.text = "⏳ Enhancing..."
+                transformedTextView.text = "Enhancing with ${selectedEnhancementType.value} style..."
+
+                when (val result = textEnhancementRepository.enhanceText(
+                    accessToken,
+                    selectedText,
+                    selectedEnhancementType
+                )) {
+                    is ApiResult.Success -> {
+                        enhancedText = result.data.enhancedText
+                        transformedTextView.text = enhancedText
+
+                        // Enable copy/replace buttons
+                        enableActionButtons(copyButton, replaceButton)
+
+                        // Update user token usage in session
+                        sessionManager.updateUserUsage(
+                            tokensUsedToday = result.data.tokensUsedToday,
+                            tokensRemaining = result.data.tokensRemainingToday,
+                            lastUsageDate = null
+                        )
+
+                        Toast.makeText(this@TextSelectionService,
+                            "Enhanced with ${selectedEnhancementType.value} style! (${result.data.tokensUsedThisRequest} tokens)",
+                            Toast.LENGTH_SHORT).show()
+                    }
+
+                    is ApiResult.Error -> {
+                        transformedTextView.text = "⚠️ ${result.message}"
+
+                        // If it's a token limit error, allow manual enhancement
+                        if (result.message.contains("token limit") || result.message.contains("tokens")) {
+                            enhancedText = transformText(selectedText, selectedEnhancementType)
+                            transformedTextView.text = "Enhanced (offline): $enhancedText"
+                            enableActionButtons(copyButton, replaceButton)
+                        }
+                    }
+
+                    is ApiResult.Loading -> {
+                        // Already handled above
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error enhancing text", e)
+                transformedTextView.text = "⚠️ Enhancement failed - trying offline mode"
+
+                // Fallback to simple transformation
+                enhancedText = transformText(selectedText, selectedEnhancementType)
+                transformedTextView.text = "Enhanced (offline): $enhancedText"
+                enableActionButtons(copyButton, replaceButton)
+
+                Toast.makeText(this@TextSelectionService,
+                    "Using offline enhancement",
+                    Toast.LENGTH_SHORT).show()
+            } finally {
+                isEnhancing = false
+                enhanceButton.isEnabled = true
+                enhanceButton.text = "✨ Enhance"
+            }
+        }
+    }
+
     private fun makeBubbleDraggable(view: View, params: WindowManager.LayoutParams) {
         view.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
@@ -306,7 +432,7 @@ class TextSelectionService : AccessibilityService() {
             private var initialTouchX = 0f
             private var initialTouchY = 0f
             private var isDragging = false
-            private val dragThreshold = 10
+            private val dragThreshold = 15
 
             override fun onTouch(v: View?, event: MotionEvent?): Boolean {
                 when (event?.action) {
@@ -323,7 +449,7 @@ class TextSelectionService : AccessibilityService() {
                         val deltaX = event.rawX - initialTouchX
                         val deltaY = event.rawY - initialTouchY
 
-                        if (!isDragging && (kotlin.math.abs(deltaX) > dragThreshold || kotlin.math.abs(deltaY) > dragThreshold)) {
+                        if (!isDragging && (abs(deltaX) > dragThreshold || abs(deltaY) > dragThreshold)) {
                             isDragging = true
                         }
 
@@ -374,9 +500,82 @@ class TextSelectionService : AccessibilityService() {
         }
     }
 
-    private fun transformText(text: String): String {
+    private fun transformText(text: String, enhancementType: EnhancementType): String {
         // Fallback transformation when API is not available
-        return text.replaceFirstChar { it.uppercase() } + " (Enhanced)"
+        return when (enhancementType) {
+            EnhancementType.PROFESSIONAL -> {
+                // Make text more formal
+                text.replace(Regex("\\b(can't|won't|don't|isn't|aren't)\\b", RegexOption.IGNORE_CASE)) { match ->
+                    when (match.value.lowercase()) {
+                        "can't" -> "cannot"
+                        "won't" -> "will not"
+                        "don't" -> "do not"
+                        "isn't" -> "is not"
+                        "aren't" -> "are not"
+                        else -> match.value
+                    }
+                }.replaceFirstChar { it.uppercase() }.let { formal ->
+                    if (!formal.endsWith(".") && !formal.endsWith("!") && !formal.endsWith("?")) {
+                        "$formal."
+                    } else formal
+                }
+            }
+
+            EnhancementType.CASUAL -> {
+                // Make text more casual and friendly
+                val casualText = text.replace(Regex("\\b(cannot|will not|do not|is not|are not)\\b", RegexOption.IGNORE_CASE)) { match ->
+                    when (match.value.lowercase()) {
+                        "cannot" -> "can't"
+                        "will not" -> "won't"
+                        "do not" -> "don't"
+                        "is not" -> "isn't"
+                        "are not" -> "aren't"
+                        else -> match.value
+                    }
+                }
+
+                // Add casual expressions
+                val endings = listOf(" 😊", " 👍", "!")
+                if (casualText.endsWith(".")) {
+                    casualText.dropLast(1) + endings.random()
+                } else {
+                    casualText + endings.random()
+                }
+            }
+
+            EnhancementType.CONCISE -> {
+                // Make text shorter and more direct
+                text.split(" ").let { words ->
+                    if (words.size > 10) {
+                        words.take(words.size / 2).joinToString(" ") + "..."
+                    } else {
+                        text.replace(Regex("\\b(very|really|quite|rather|somewhat|extremely)\\s+", RegexOption.IGNORE_CASE), "")
+                            .replace(Regex("\\bin order to\\b", RegexOption.IGNORE_CASE), "to")
+                            .replace(Regex("\\bdue to the fact that\\b", RegexOption.IGNORE_CASE), "because")
+                    }
+                }
+            }
+
+            EnhancementType.DETAILED -> {
+                // Add more detail and explanation
+                val sentences = text.split(Regex("[.!?]+")).filter { it.trim().isNotEmpty() }
+                sentences.joinToString(". ") { sentence ->
+                    val trimmed = sentence.trim()
+                    if (trimmed.isNotEmpty()) {
+                        "$trimmed (with additional context and explanation)"
+                    } else trimmed
+                } + "."
+            }
+
+            else -> {
+                // General enhancement - improve grammar and clarity
+                text.replaceFirstChar { it.uppercase() }.let { improved ->
+                    if (!improved.endsWith(".") && !improved.endsWith("!") && !improved.endsWith("?")) {
+                        "$improved."
+                    } else improved
+                } + " [Enhanced]"
+            }
+        }
     }
 
     private fun copyToClipboard(text: String) {
