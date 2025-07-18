@@ -1,5 +1,7 @@
+// TextSelectionService.kt - Fixed to start on demand without persistent notification
 package com.example.textselectionbubble
 
+import android.R.id.closeButton
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ClipData
@@ -49,34 +51,39 @@ class TextSelectionService : AccessibilityService() {
     private var selectionEnd = -1
     private var delayJob: Job? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
     private lateinit var sharedPrefs: SharedPreferences
 
-    // Bubble position tracking
+    // Position tracking
     private var bubbleX = 100
     private var bubbleY = 200
 
-    // API and enhancement
+    // API components
     private lateinit var sessionManager: UserSessionManager
     private lateinit var textEnhancementRepository: TextEnhancementRepository
     private var isEnhancing = false
     private var enhancedText = ""
     private var selectedEnhancementType = EnhancementType.GENERAL
 
-    // Keep references for style buttons
+    // UI components
     private var enhancementButtons: List<Button> = emptyList()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "Service Connected")
 
-        // Preferences
+        // Initialize shared preferences
         sharedPrefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // Mark service as active (connected to system)
         sharedPrefs.edit().putBoolean(KEY_SERVICE_ACTIVE, true).apply()
 
+        // Initialize other components
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         sessionManager = UserSessionManager(applicationContext)
         textEnhancementRepository = TextEnhancementRepository(NetworkModule.apiService)
 
+        // Configure service for text selection monitoring only
         val info = AccessibilityServiceInfo().apply {
             eventTypes = AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
@@ -85,34 +92,48 @@ class TextSelectionService : AccessibilityService() {
             notificationTimeout = 100
         }
         serviceInfo = info
-        Log.d(TAG, "Service configured and ready for text selection events")
+
+        Log.d(TAG, "Service configured and ready - waiting for text selection events")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (!isMonitoringEnabled()) return
+        // Only process if monitoring is enabled
+        if (!isMonitoringEnabled()) {
+            return
+        }
+
+        // Only process text selection events
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
             handleTextSelectionChanged(event)
         }
     }
 
     private fun isMonitoringEnabled(): Boolean {
-        return sharedPrefs.getBoolean(KEY_MONITORING_ENABLED, false) // Change to 'false' if you want opt-in
+        return sharedPrefs.getBoolean(KEY_MONITORING_ENABLED, false)
     }
 
     private fun handleTextSelectionChanged(event: AccessibilityEvent) {
         Log.d(TAG, "Text selection changed - From: ${event.fromIndex}, To: ${event.toIndex}")
+
+        // Cancel any pending bubble show
         cancelPendingBubble()
 
-        val sourceNode = event.source ?: run {
+        // Get the source node
+        val sourceNode = event.source
+        if (sourceNode == null) {
             Log.d(TAG, "Source node is null")
             hideBubble()
             return
         }
 
+        // Store the node reference
         selectedNode = sourceNode
+
+        // Get the selected text
         val newSelectedText = extractSelectedText(sourceNode, event.fromIndex, event.toIndex)
         Log.d(TAG, "Extracted text: '$newSelectedText'")
 
+        // Validate selection
         val hasValidSelection = newSelectedText != null &&
                 newSelectedText.trim().isNotEmpty() &&
                 newSelectedText.trim().length > 1 &&
@@ -123,25 +144,28 @@ class TextSelectionService : AccessibilityService() {
             selectedText = newSelectedText!!.trim()
             selectionStart = event.fromIndex
             selectionEnd = event.toIndex
+
             Log.d(TAG, "Valid selection: '$selectedText' (${selectionStart}-${selectionEnd})")
             scheduleShowBubble()
         } else {
-            Log.d(TAG, "Invalid/no selection, hiding bubble")
+            Log.d(TAG, "Invalid selection, hiding bubble")
             hideBubble()
         }
     }
 
     private fun extractSelectedText(node: AccessibilityNodeInfo, fromIndex: Int, toIndex: Int): String? {
         return try {
+            // Method 1: Direct text extraction
             val nodeText = node.text
             if (nodeText != null && fromIndex >= 0 && toIndex > fromIndex &&
-                fromIndex < nodeText.length && toIndex <= nodeText.length
-            ) {
-                val selected = nodeText.subSequence(fromIndex, toIndex).toString()
-                Log.d(TAG, "Direct extraction: '$selected'")
-                return selected
+                fromIndex < nodeText.length && toIndex <= nodeText.length) {
+
+                val selectedText = nodeText.subSequence(fromIndex, toIndex).toString()
+                Log.d(TAG, "Direct extraction: '$selectedText'")
+                return selectedText
             }
-            // Clipboard fallback (rarely used)
+
+            // Method 2: Clipboard fallback (minimal use)
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clipData = clipboard.primaryClip
             if (clipData != null && clipData.itemCount > 0) {
@@ -151,6 +175,7 @@ class TextSelectionService : AccessibilityService() {
                     return clipText
                 }
             }
+
             null
         } catch (e: Exception) {
             Log.e(TAG, "Error extracting selected text", e)
@@ -175,16 +200,18 @@ class TextSelectionService : AccessibilityService() {
 
         val inflater = LayoutInflater.from(this)
         bubbleView = inflater.inflate(R.layout.bubble_layout, null)
+
         val currentBubbleView = bubbleView ?: return
 
+        // Initialize UI elements
         val selectedTextView = currentBubbleView.findViewById<TextView>(R.id.tvSelectedText)
         val transformedTextView = currentBubbleView.findViewById<TextView>(R.id.tvTransformedText)
         val enhanceButton = currentBubbleView.findViewById<Button>(R.id.btnEnhance)
         val copyButton = currentBubbleView.findViewById<Button>(R.id.btnCopy)
         val replaceButton = currentBubbleView.findViewById<Button>(R.id.btnReplace)
-        val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
+//        val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
 
-        // Enhancement style buttons
+        // Enhancement type buttons
         val generalButton = currentBubbleView.findViewById<Button>(R.id.btnGeneral)
         val professionalButton = currentBubbleView.findViewById<Button>(R.id.btnProfessional)
         val casualButton = currentBubbleView.findViewById<Button>(R.id.btnCasual)
@@ -193,21 +220,22 @@ class TextSelectionService : AccessibilityService() {
 
         enhancementButtons = listOf(generalButton, professionalButton, casualButton, conciseButton, detailedButton)
 
-        // Reset UI
+        // Initialize UI
         selectedTextView.text = "Selected: ${selectedText.take(50)}${if (selectedText.length > 50) "..." else ""}"
         transformedTextView.text = "Select enhancement style and tap ✨ to enhance text"
-        enhanceButton.isEnabled = true
-        disableActionButtons(copyButton, replaceButton)
+
+        // Reset state
         enhancedText = ""
         selectedEnhancementType = EnhancementType.GENERAL
-        updateEnhancementButtonStates()
 
-        // Setup button handlers
+        disableActionButtons(copyButton, replaceButton)
+        enhanceButton.isEnabled = true
+
+        // Set up button handlers
         setupEnhancementTypeButtons()
         setupActionButtons(transformedTextView, copyButton, replaceButton, enhanceButton)
-        closeButton.setOnClickListener { hideBubble() }
 
-        // Window params and draggable
+        // Configure window parameters
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -222,6 +250,7 @@ class TextSelectionService : AccessibilityService() {
             x = bubbleX
             y = bubbleY
         }
+
         makeBubbleDraggable(currentBubbleView, params)
 
         try {
@@ -253,9 +282,11 @@ class TextSelectionService : AccessibilityService() {
         replaceButton.setOnClickListener {
             val textToReplace = if (enhancedText.isNotEmpty()) enhancedText else selectedText
             replaceButton.text = "⏳"
+
             if (replaceSelectedText(textToReplace)) {
                 showButtonFeedback(replaceButton, "✓", R.color.success_color)
                 Toast.makeText(this, "Text replaced successfully!", Toast.LENGTH_SHORT).show()
+
                 serviceScope.launch {
                     delay(1000)
                     hideBubble()
@@ -266,13 +297,17 @@ class TextSelectionService : AccessibilityService() {
                 Toast.makeText(this, "Copied to clipboard - manual paste needed", Toast.LENGTH_LONG).show()
             }
         }
+        val closeButton = bubbleView?.findViewById<Button>(R.id.btnClose)
+        closeButton?.setOnClickListener { hideBubble() }
     }
 
     private fun showButtonFeedback(button: Button, text: String, colorRes: Int) {
         val originalText = button.text
         val originalColor = button.currentTextColor
+
         button.text = text
         button.setTextColor(ContextCompat.getColor(this, colorRes))
+
         serviceScope.launch {
             delay(1000)
             button.text = originalText
@@ -288,12 +323,16 @@ class TextSelectionService : AccessibilityService() {
             EnhancementType.CONCISE,
             EnhancementType.DETAILED
         )
-        enhancementButtons.forEachIndexed { idx, button ->
+
+        enhancementButtons.forEachIndexed { index, button ->
+            val enhancementType = enhancementTypes[index]
             button.setOnClickListener {
-                selectedEnhancementType = enhancementTypes[idx]
+                selectedEnhancementType = enhancementType
                 updateEnhancementButtonStates()
             }
         }
+
+        updateEnhancementButtonStates()
     }
 
     private fun updateEnhancementButtonStates() {
@@ -304,9 +343,11 @@ class TextSelectionService : AccessibilityService() {
             EnhancementType.CONCISE,
             EnhancementType.DETAILED
         )
-        enhancementButtons.forEachIndexed { idx, button ->
-            val isSelected = enhancementTypes[idx] == selectedEnhancementType
+
+        enhancementButtons.forEachIndexed { index, button ->
+            val isSelected = enhancementTypes[index] == selectedEnhancementType
             button.isSelected = isSelected
+
             if (isSelected) {
                 button.setBackgroundResource(R.drawable.enhancement_button_selected)
                 button.setTextColor(ContextCompat.getColor(this, android.R.color.white))
@@ -344,14 +385,17 @@ class TextSelectionService : AccessibilityService() {
         serviceScope.launch {
             try {
                 val accessToken = sessionManager.getAccessToken().first()
+
                 if (accessToken == null) {
                     transformedTextView.text = "Please log in to enhance text"
                     return@launch
                 }
+
                 isEnhancing = true
                 enhanceButton.isEnabled = false
-                enhanceButton.text = "⏳"
-                transformedTextView.text = "Enhancing (${selectedEnhancementType.value})..."
+                enhanceButton.text = "⏳ Enhancing..."
+                transformedTextView.text = "Enhancing with ${selectedEnhancementType.value} style..."
+
                 when (val result = textEnhancementRepository.enhanceText(
                     accessToken,
                     selectedText,
@@ -361,28 +405,30 @@ class TextSelectionService : AccessibilityService() {
                         enhancedText = result.data.enhancedText
                         transformedTextView.text = enhancedText
                         enableActionButtons(copyButton, replaceButton)
+
                         sessionManager.updateUserUsage(
                             tokensUsedToday = result.data.tokensUsedToday,
                             tokensRemaining = result.data.tokensRemainingToday,
                             lastUsageDate = null
                         )
-                        Toast.makeText(
-                            this@TextSelectionService,
+
+                        Toast.makeText(this@TextSelectionService,
                             "Enhanced! (${result.data.tokensUsedThisRequest} tokens)",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.LENGTH_SHORT).show()
                     }
 
                     is ApiResult.Error -> {
                         transformedTextView.text = "⚠️ ${result.message}"
-                        if (result.message.contains("token limit", true) || result.message.contains("tokens", true)) {
+                        if (result.message.contains("token limit") || result.message.contains("tokens")) {
                             enhancedText = transformText(selectedText, selectedEnhancementType)
                             transformedTextView.text = "Enhanced (offline): $enhancedText"
                             enableActionButtons(copyButton, replaceButton)
                         }
                     }
 
-                    is ApiResult.Loading -> {} // Already handled
+                    is ApiResult.Loading -> {
+                        // Already handled
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error enhancing text", e)
@@ -393,7 +439,7 @@ class TextSelectionService : AccessibilityService() {
             } finally {
                 isEnhancing = false
                 enhanceButton.isEnabled = true
-                enhanceButton.text = "✨"
+                enhanceButton.text = "✨ Enhance"
             }
         }
     }
@@ -421,14 +467,17 @@ class TextSelectionService : AccessibilityService() {
                     MotionEvent.ACTION_MOVE -> {
                         val deltaX = event.rawX - initialTouchX
                         val deltaY = event.rawY - initialTouchY
+
                         if (!isDragging && (abs(deltaX) > dragThreshold || abs(deltaY) > dragThreshold)) {
                             isDragging = true
                         }
+
                         if (isDragging) {
                             params.x = initialX + deltaX.toInt()
                             params.y = initialY + deltaY.toInt()
                             bubbleX = params.x
                             bubbleY = params.y
+
                             try {
                                 windowManager?.updateViewLayout(view, params)
                             } catch (e: Exception) {
@@ -439,11 +488,12 @@ class TextSelectionService : AccessibilityService() {
                     }
 
                     MotionEvent.ACTION_UP -> {
-                        if (!isDragging) return false
+                        if (!isDragging) {
+                            return false
+                        }
                         bubbleX = params.x
                         bubbleY = params.y
                         isDragging = false
-                        Log.d(TAG, "Bubble position saved: x=$bubbleX, y=$bubbleY")
                         return true
                     }
 
@@ -466,7 +516,7 @@ class TextSelectionService : AccessibilityService() {
     }
 
     private fun transformText(text: String, enhancementType: EnhancementType): String {
-        // Simple offline transformations for each style
+        // Offline fallback transformation
         return when (enhancementType) {
             EnhancementType.PROFESSIONAL -> {
                 text.replace(Regex("\\b(can't|won't|don't|isn't|aren't)\\b", RegexOption.IGNORE_CASE)) { match ->
@@ -479,7 +529,9 @@ class TextSelectionService : AccessibilityService() {
                         else -> match.value
                     }
                 }.replaceFirstChar { it.uppercase() }.let { formal ->
-                    if (!formal.endsWith(".") && !formal.endsWith("!") && !formal.endsWith("?")) "$formal." else formal
+                    if (!formal.endsWith(".") && !formal.endsWith("!") && !formal.endsWith("?")) {
+                        "$formal."
+                    } else formal
                 }
             }
             EnhancementType.CASUAL -> {
@@ -506,7 +558,9 @@ class TextSelectionService : AccessibilityService() {
             }
             else -> {
                 text.replaceFirstChar { it.uppercase() }.let { improved ->
-                    if (!improved.endsWith(".") && !improved.endsWith("!") && !improved.endsWith("?")) "$improved." else improved
+                    if (!improved.endsWith(".") && !improved.endsWith("!") && !improved.endsWith("?")) {
+                        "$improved."
+                    } else improved
                 }
             }
         }
@@ -520,32 +574,26 @@ class TextSelectionService : AccessibilityService() {
 
     private fun replaceSelectedText(newText: String): Boolean {
         val node = selectedNode ?: return false
+
         return try {
             if (tryReplaceUsingPaste(node, newText)) {
                 return true
             }
+
             val fullText = node.text?.toString() ?: return false
             if (selectionStart >= 0 && selectionEnd > selectionStart &&
-                selectionStart < fullText.length && selectionEnd <= fullText.length
-            ) {
+                selectionStart < fullText.length && selectionEnd <= fullText.length) {
+
                 val before = fullText.substring(0, selectionStart)
                 val after = fullText.substring(selectionEnd)
                 val newFullText = before + newText + after
+
                 val arguments = Bundle().apply {
                     putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newFullText)
                 }
-                val success = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
-                if (success) {
-                    val newCursorPosition = selectionStart + newText.length
-                    val selectionArgs = Bundle().apply {
-                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, newCursorPosition)
-                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, newCursorPosition)
-                    }
-                    node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectionArgs)
-                }
-                return success
-            }
-            false
+
+                node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+            } else false
         } catch (e: Exception) {
             Log.e(TAG, "Failed to replace text", e)
             false
@@ -565,10 +613,13 @@ class TextSelectionService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Service Destroyed")
+
+        // Clean up and mark service as stopped
         sharedPrefs.edit()
             .putBoolean(KEY_SERVICE_ACTIVE, false)
             .putBoolean(KEY_MONITORING_ENABLED, false)
             .apply()
+
         cancelPendingBubble()
         serviceScope.cancel()
         hideBubble()
@@ -576,12 +627,14 @@ class TextSelectionService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         Log.d(TAG, "Service Unbound")
-        return false // false: allow rebinding
+        return false // Return false to allow rebinding
     }
 
     override fun onRebind(intent: Intent?) {
         super.onRebind(intent)
         Log.d(TAG, "Service Rebound")
+
+        // Service was restarted, ensure it's marked as active
         sharedPrefs.edit().putBoolean(KEY_SERVICE_ACTIVE, true).apply()
     }
 
