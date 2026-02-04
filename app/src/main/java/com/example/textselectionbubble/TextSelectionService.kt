@@ -1,13 +1,11 @@
-// TextSelectionService.kt - Fixed to start on demand without persistent notification
+// TextSelectionService.kt - Updated with minimized icon and improved UX flow
 package com.example.textselectionbubble
 
-import android.R.id.closeButton
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.PixelFormat
 import android.os.Build
@@ -21,8 +19,11 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import com.example.textselectionbubble.data.UserSessionManager
 import com.example.textselectionbubble.data.models.EnhancementType
@@ -67,6 +68,11 @@ class TextSelectionService : AccessibilityService() {
 
     // UI components
     private var enhancementButtons: List<Button> = emptyList()
+
+    // Bubble state
+    private var isExpanded = false
+    private lateinit var minimizedView: CardView
+    private lateinit var expandedView: CardView
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -203,37 +209,62 @@ class TextSelectionService : AccessibilityService() {
 
         val currentBubbleView = bubbleView ?: return
 
-        // Initialize UI elements
-        val selectedTextView = currentBubbleView.findViewById<TextView>(R.id.tvSelectedText)
-        val transformedTextView = currentBubbleView.findViewById<TextView>(R.id.tvTransformedText)
-        val enhanceButton = currentBubbleView.findViewById<Button>(R.id.btnEnhance)
-        val copyButton = currentBubbleView.findViewById<Button>(R.id.btnCopy)
-        val replaceButton = currentBubbleView.findViewById<Button>(R.id.btnReplace)
-//        val closeButton = currentBubbleView.findViewById<Button>(R.id.btnClose)
+        // Initialize views
+        minimizedView = currentBubbleView.findViewById(R.id.minimizedView)
+        expandedView = currentBubbleView.findViewById(R.id.expandedView)
+
+        // Initialize UI elements in expanded view
+        val selectedTextView = expandedView.findViewById<TextView>(R.id.tvSelectedText)
+        val transformedTextView = expandedView.findViewById<TextView>(R.id.tvTransformedText)
+        val enhanceButton = expandedView.findViewById<Button>(R.id.btnEnhance)
+        val copyButton = expandedView.findViewById<Button>(R.id.btnCopy)
+        val replaceButton = expandedView.findViewById<Button>(R.id.btnReplace)
+        val closeButton = expandedView.findViewById<android.widget.ImageButton>(R.id.btnClose)
+        val minimizeButton = expandedView.findViewById<android.widget.ImageButton>(R.id.btnMinimize)
+        val enhancedResultSection = expandedView.findViewById<LinearLayout>(R.id.enhancedResultSection)
+        val progressContainer = expandedView.findViewById<LinearLayout>(R.id.progressContainer)
 
         // Enhancement type buttons
-        val generalButton = currentBubbleView.findViewById<Button>(R.id.btnGeneral)
-        val professionalButton = currentBubbleView.findViewById<Button>(R.id.btnProfessional)
-        val casualButton = currentBubbleView.findViewById<Button>(R.id.btnCasual)
-        val conciseButton = currentBubbleView.findViewById<Button>(R.id.btnConcise)
-        val detailedButton = currentBubbleView.findViewById<Button>(R.id.btnDetailed)
+        val generalButton = expandedView.findViewById<Button>(R.id.btnGeneral)
+        val professionalButton = expandedView.findViewById<Button>(R.id.btnProfessional)
+        val casualButton = expandedView.findViewById<Button>(R.id.btnCasual)
+        val conciseButton = expandedView.findViewById<Button>(R.id.btnConcise)
+        val detailedButton = expandedView.findViewById<Button>(R.id.btnDetailed)
 
         enhancementButtons = listOf(generalButton, professionalButton, casualButton, conciseButton, detailedButton)
 
         // Initialize UI
-        selectedTextView.text = "Selected: ${selectedText.take(50)}${if (selectedText.length > 50) "..." else ""}"
-        transformedTextView.text = "Select enhancement style and tap ✨ to enhance text"
+        selectedTextView.text = selectedText
+        enhancedResultSection.visibility = View.GONE
 
         // Reset state
         enhancedText = ""
         selectedEnhancementType = EnhancementType.GENERAL
+        isExpanded = false
 
-        disableActionButtons(copyButton, replaceButton)
-        enhanceButton.isEnabled = true
+        // Show minimized view first
+        minimizedView.visibility = View.VISIBLE
+        expandedView.visibility = View.GONE
 
         // Set up button handlers
         setupEnhancementTypeButtons()
-        setupActionButtons(transformedTextView, copyButton, replaceButton, enhanceButton)
+        setupActionButtons(transformedTextView, copyButton, replaceButton, enhanceButton,
+            enhancedResultSection, progressContainer)
+
+        // Minimize button - collapse to icon
+        minimizeButton.setOnClickListener {
+            collapseToIcon()
+        }
+
+        // Close button - completely hide bubble
+        closeButton.setOnClickListener {
+            hideBubble()
+        }
+
+        // Minimized icon click - expand to full bubble
+        minimizedView.setOnClickListener {
+            expandBubble()
+        }
 
         // Configure window parameters
         val params = WindowManager.LayoutParams(
@@ -255,50 +286,72 @@ class TextSelectionService : AccessibilityService() {
 
         try {
             windowManager?.addView(currentBubbleView, params)
-            Log.d(TAG, "Bubble shown successfully")
+            Log.d(TAG, "Bubble shown successfully (minimized)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show bubble", e)
         }
+    }
+
+    private fun expandBubble() {
+        isExpanded = true
+        minimizedView.visibility = View.GONE
+        expandedView.visibility = View.VISIBLE
+        Log.d(TAG, "Bubble expanded")
+    }
+
+    private fun collapseToIcon() {
+        isExpanded = false
+        expandedView.visibility = View.GONE
+        minimizedView.visibility = View.VISIBLE
+        Log.d(TAG, "Bubble collapsed to icon")
     }
 
     private fun setupActionButtons(
         transformedTextView: TextView,
         copyButton: Button,
         replaceButton: Button,
-        enhanceButton: Button
+        enhanceButton: Button,
+        enhancedResultSection: LinearLayout,
+        progressContainer: LinearLayout
     ) {
         enhanceButton.setOnClickListener {
             if (isEnhancing) return@setOnClickListener
-            enhanceText(transformedTextView, copyButton, replaceButton, enhanceButton)
+            enhanceText(transformedTextView, copyButton, replaceButton, enhanceButton,
+                enhancedResultSection, progressContainer)
         }
 
         copyButton.setOnClickListener {
-            val textToCopy = if (enhancedText.isNotEmpty()) enhancedText else selectedText
-            copyToClipboard(textToCopy)
-            showButtonFeedback(copyButton, "✓", R.color.success_color)
-            Toast.makeText(this, "Copied enhanced text!", Toast.LENGTH_SHORT).show()
+            copyToClipboard(enhancedText)
+            showButtonFeedback(copyButton, "✓ Copied", R.color.success_color)
+            Toast.makeText(this, "Enhanced text copied!", Toast.LENGTH_SHORT).show()
         }
 
         replaceButton.setOnClickListener {
-            val textToReplace = if (enhancedText.isNotEmpty()) enhancedText else selectedText
+            val originalText = replaceButton.text
             replaceButton.text = "⏳"
+            replaceButton.isEnabled = false
 
-            if (replaceSelectedText(textToReplace)) {
-                showButtonFeedback(replaceButton, "✓", R.color.success_color)
+            if (replaceSelectedText(enhancedText)) {
+                showButtonFeedback(replaceButton, "✓ Replaced", R.color.success_color)
                 Toast.makeText(this, "Text replaced successfully!", Toast.LENGTH_SHORT).show()
 
                 serviceScope.launch {
-                    delay(1000)
+                    delay(1500)
                     hideBubble()
                 }
             } else {
-                copyToClipboard(textToReplace)
-                showButtonFeedback(replaceButton, "📋", R.color.warning_color)
-                Toast.makeText(this, "Copied to clipboard - manual paste needed", Toast.LENGTH_LONG).show()
+                // Fallback to copy
+                copyToClipboard(enhancedText)
+                showButtonFeedback(replaceButton, "📋 Copied", R.color.warning_color)
+                Toast.makeText(this, "Copied to clipboard - paste manually", Toast.LENGTH_LONG).show()
+
+                serviceScope.launch {
+                    delay(2000)
+                    replaceButton.text = originalText
+                    replaceButton.isEnabled = true
+                }
             }
         }
-        val closeButton = bubbleView?.findViewById<Button>(R.id.btnClose)
-        closeButton?.setOnClickListener { hideBubble() }
     }
 
     private fun showButtonFeedback(button: Button, text: String, colorRes: Int) {
@@ -309,7 +362,7 @@ class TextSelectionService : AccessibilityService() {
         button.setTextColor(ContextCompat.getColor(this, colorRes))
 
         serviceScope.launch {
-            delay(1000)
+            delay(1500)
             button.text = originalText
             button.setTextColor(originalColor)
         }
@@ -358,43 +411,28 @@ class TextSelectionService : AccessibilityService() {
         }
     }
 
-    private fun enableActionButtons(copyButton: Button, replaceButton: Button) {
-        copyButton.isEnabled = true
-        replaceButton.isEnabled = true
-        copyButton.setBackgroundResource(R.drawable.enhanced_action_button)
-        replaceButton.setBackgroundResource(R.drawable.enhanced_action_button)
-        copyButton.setTextColor(ContextCompat.getColor(this, android.R.color.white))
-        replaceButton.setTextColor(ContextCompat.getColor(this, android.R.color.white))
-    }
-
-    private fun disableActionButtons(copyButton: Button, replaceButton: Button) {
-        copyButton.isEnabled = false
-        replaceButton.isEnabled = false
-        copyButton.setBackgroundResource(R.drawable.disabled_action_button)
-        replaceButton.setBackgroundResource(R.drawable.disabled_action_button)
-        copyButton.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
-        replaceButton.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
-    }
-
     private fun enhanceText(
         transformedTextView: TextView,
         copyButton: Button,
         replaceButton: Button,
-        enhanceButton: Button
+        enhanceButton: Button,
+        enhancedResultSection: LinearLayout,
+        progressContainer: LinearLayout
     ) {
         serviceScope.launch {
             try {
                 val accessToken = sessionManager.getAccessToken().first()
 
                 if (accessToken == null) {
-                    transformedTextView.text = "Please log in to enhance text"
+                    Toast.makeText(this@TextSelectionService,
+                        "Please log in to enhance text", Toast.LENGTH_SHORT).show()
                     return@launch
                 }
 
                 isEnhancing = true
                 enhanceButton.isEnabled = false
-                enhanceButton.text = "⏳ Enhancing..."
-                transformedTextView.text = "Enhancing with ${selectedEnhancementType.value} style..."
+                enhanceButton.text = "⏳ Processing..."
+                progressContainer.visibility = View.VISIBLE
 
                 when (val result = textEnhancementRepository.enhanceText(
                     accessToken,
@@ -404,7 +442,10 @@ class TextSelectionService : AccessibilityService() {
                     is ApiResult.Success -> {
                         enhancedText = result.data.enhancedText
                         transformedTextView.text = enhancedText
-                        enableActionButtons(copyButton, replaceButton)
+
+                        // Show the enhanced result section
+                        enhancedResultSection.visibility = View.VISIBLE
+                        progressContainer.visibility = View.GONE
 
                         sessionManager.updateUserUsage(
                             tokensUsedToday = result.data.tokensUsedToday,
@@ -413,16 +454,25 @@ class TextSelectionService : AccessibilityService() {
                         )
 
                         Toast.makeText(this@TextSelectionService,
-                            "Enhanced! (${result.data.tokensUsedThisRequest} tokens)",
+                            "✅ Enhanced! (${result.data.tokensUsedThisRequest} tokens)",
                             Toast.LENGTH_SHORT).show()
                     }
 
                     is ApiResult.Error -> {
-                        transformedTextView.text = "⚠️ ${result.message}"
+                        progressContainer.visibility = View.GONE
+
                         if (result.message.contains("token limit") || result.message.contains("tokens")) {
+                            // Use offline mode
                             enhancedText = transformText(selectedText, selectedEnhancementType)
-                            transformedTextView.text = "Enhanced (offline): $enhancedText"
-                            enableActionButtons(copyButton, replaceButton)
+                            transformedTextView.text = enhancedText
+                            enhancedResultSection.visibility = View.VISIBLE
+
+                            Toast.makeText(this@TextSelectionService,
+                                "⚠️ Daily limit reached - using offline mode",
+                                Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(this@TextSelectionService,
+                                "⚠️ ${result.message}", Toast.LENGTH_LONG).show()
                         }
                     }
 
@@ -432,14 +482,19 @@ class TextSelectionService : AccessibilityService() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error enhancing text", e)
-                transformedTextView.text = "⚠️ Enhancement failed - using offline mode"
+                progressContainer.visibility = View.GONE
+
+                // Fallback to offline mode
                 enhancedText = transformText(selectedText, selectedEnhancementType)
-                transformedTextView.text = "Enhanced (offline): $enhancedText"
-                enableActionButtons(copyButton, replaceButton)
+                transformedTextView.text = enhancedText
+                enhancedResultSection.visibility = View.VISIBLE
+
+                Toast.makeText(this@TextSelectionService,
+                    "⚠️ Using offline mode", Toast.LENGTH_SHORT).show()
             } finally {
                 isEnhancing = false
                 enhanceButton.isEnabled = true
-                enhanceButton.text = "✨ Enhance"
+                enhanceButton.text = "✨ Enhance Text"
             }
         }
     }
@@ -576,10 +631,12 @@ class TextSelectionService : AccessibilityService() {
         val node = selectedNode ?: return false
 
         return try {
+            // Method 1: Try paste method first
             if (tryReplaceUsingPaste(node, newText)) {
                 return true
             }
 
+            // Method 2: Try SET_TEXT action
             val fullText = node.text?.toString() ?: return false
             if (selectionStart >= 0 && selectionEnd > selectionStart &&
                 selectionStart < fullText.length && selectionEnd <= fullText.length) {
@@ -603,6 +660,8 @@ class TextSelectionService : AccessibilityService() {
     private fun tryReplaceUsingPaste(node: AccessibilityNodeInfo, newText: String): Boolean {
         return try {
             copyToClipboard(newText)
+            // Small delay to ensure clipboard is updated
+            Thread.sleep(100)
             node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to replace using paste", e)
@@ -623,19 +682,6 @@ class TextSelectionService : AccessibilityService() {
         cancelPendingBubble()
         serviceScope.cancel()
         hideBubble()
-    }
-
-    override fun onUnbind(intent: Intent?): Boolean {
-        Log.d(TAG, "Service Unbound")
-        return false // Return false to allow rebinding
-    }
-
-    override fun onRebind(intent: Intent?) {
-        super.onRebind(intent)
-        Log.d(TAG, "Service Rebound")
-
-        // Service was restarted, ensure it's marked as active
-        sharedPrefs.edit().putBoolean(KEY_SERVICE_ACTIVE, true).apply()
     }
 
     override fun onInterrupt() {

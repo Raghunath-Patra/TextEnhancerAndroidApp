@@ -1,247 +1,291 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="12dp"
-    app:cardBackgroundColor="@color/bubble_background">
+    android:layout_height="wrap_content">
 
-    <LinearLayout
-        android:layout_width="320dp"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+    <!-- Minimized Icon Button - Shows first when text is selected -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/minimizedView"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_margin="8dp"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="12dp"
+        app:cardBackgroundColor="@color/enhancement_selected"
+        android:visibility="visible">
 
-        <!-- Header with selected text -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical">
 
             <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Selected Text"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:textStyle="bold" />
-
-            <ImageButton
-                android:id="@+id/btnMinimize"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:contentDescription="Minimize"
-                android:tint="@color/text_secondary" />
-        </LinearLayout>
-
-        <!-- Selected Text Display -->
-        <TextView
-            android:id="@+id/tvSelectedText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Sample selected text will appear here"
-            android:textSize="11sp"
-            android:textColor="@color/text_primary"
-            android:maxLines="3"
-            android:ellipsize="end"
-            android:layout_marginBottom="16dp"
-            android:background="#F8F9FA"
-            android:padding="12dp"
-            android:lineSpacingExtra="2dp" />
-
-        <!-- Enhancement Type Selector -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Enhancement Style"
-            android:textSize="12sp"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:scrollbars="none">
-
-            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:text="✨"
+                android:textSize="24sp" />
 
-                <Button
-                    android:id="@+id/btnGeneral"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
-                    android:text="✨ General"
-                    android:textSize="10sp"
-                    android:background="@drawable/enhancement_button_selector"
-                    android:textColor="@color/enhancement_selected"
-                    android:padding="8dp"
-                    android:minWidth="0dp" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
-                <Button
-                    android:id="@+id/btnProfessional"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
-                    android:text="👔 Formal"
-                    android:textSize="10sp"
-                    android:background="@drawable/enhancement_button_selector"
-                    android:textColor="@color/enhancement_selected"
-                    android:padding="8dp"
-                    android:minWidth="0dp" />
+    <!-- Expanded Bubble View - Shows when icon is clicked -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/expandedView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="12dp"
+        app:cardBackgroundColor="@color/bubble_background"
+        android:visibility="gone">
 
-                <Button
-                    android:id="@+id/btnCasual"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
-                    android:text="😊 Casual"
-                    android:textSize="10sp"
-                    android:background="@drawable/enhancement_button_selector"
-                    android:textColor="@color/enhancement_selected"
-                    android:padding="8dp"
-                    android:minWidth="0dp" />
-
-                <Button
-                    android:id="@+id/btnConcise"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
-                    android:text="⚡ Brief"
-                    android:textSize="10sp"
-                    android:background="@drawable/enhancement_button_selector"
-                    android:textColor="@color/enhancement_selected"
-                    android:padding="8dp"
-                    android:minWidth="0dp" />
-
-                <Button
-                    android:id="@+id/btnDetailed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:text="📝 Detailed"
-                    android:textSize="10sp"
-                    android:background="@drawable/enhancement_button_selector"
-                    android:textColor="@color/enhancement_selected"
-                    android:padding="8dp"
-                    android:minWidth="0dp" />
-
-            </LinearLayout>
-        </HorizontalScrollView>
-
-        <!-- Enhanced Text Display -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Enhanced Result"
-            android:textSize="12sp"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:id="@+id/tvTransformedText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Enhanced text will appear here after processing"
-            android:textSize="12sp"
-            android:textColor="@color/text_primary"
-            android:maxLines="5"
-            android:ellipsize="end"
-            android:layout_marginBottom="16dp"
-            android:background="#F0F8FF"
-            android:padding="12dp"
-            android:textIsSelectable="true"
-            android:minHeight="80dp"
-            android:gravity="top"
-            android:lineSpacingExtra="2dp" />
-
-        <!-- Action Buttons -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="320dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:orientation="vertical"
+            android:padding="16dp">
 
+            <!-- Header with minimize button -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Selected Text"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/btnMinimize"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:contentDescription="Minimize"
+                    app:tint="@color/text_secondary" />
+
+                <ImageButton
+                    android:id="@+id/btnClose"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_delete"
+                    android:contentDescription="Close"
+                    app:tint="@color/close_button_color" />
+            </LinearLayout>
+
+            <!-- Selected Text Display -->
+            <TextView
+                android:id="@+id/tvSelectedText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sample selected text will appear here"
+                android:textSize="11sp"
+                android:textColor="@color/text_primary"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:layout_marginBottom="16dp"
+                android:background="#F8F9FA"
+                android:padding="12dp"
+                android:lineSpacingExtra="2dp" />
+
+            <!-- Enhancement Type Selector -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enhancement Style"
+                android:textSize="12sp"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnGeneral"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="8dp"
+                        android:text="✨ General"
+                        android:textSize="10sp"
+                        android:background="@drawable/enhancement_button_selector"
+                        android:textColor="@color/enhancement_selected"
+                        android:padding="8dp"
+                        android:minWidth="0dp" />
+
+                    <Button
+                        android:id="@+id/btnProfessional"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="8dp"
+                        android:text="👔 Formal"
+                        android:textSize="10sp"
+                        android:background="@drawable/enhancement_button_selector"
+                        android:textColor="@color/enhancement_selected"
+                        android:padding="8dp"
+                        android:minWidth="0dp" />
+
+                    <Button
+                        android:id="@+id/btnCasual"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="8dp"
+                        android:text="😊 Casual"
+                        android:textSize="10sp"
+                        android:background="@drawable/enhancement_button_selector"
+                        android:textColor="@color/enhancement_selected"
+                        android:padding="8dp"
+                        android:minWidth="0dp" />
+
+                    <Button
+                        android:id="@+id/btnConcise"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="8dp"
+                        android:text="⚡ Brief"
+                        android:textSize="10sp"
+                        android:background="@drawable/enhancement_button_selector"
+                        android:textColor="@color/enhancement_selected"
+                        android:padding="8dp"
+                        android:minWidth="0dp" />
+
+                    <Button
+                        android:id="@+id/btnDetailed"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="📝 Detailed"
+                        android:textSize="10sp"
+                        android:background="@drawable/enhancement_button_selector"
+                        android:textColor="@color/enhancement_selected"
+                        android:padding="8dp"
+                        android:minWidth="0dp" />
+
+                </LinearLayout>
+            </HorizontalScrollView>
+
+            <!-- Enhance Button -->
             <Button
                 android:id="@+id/btnEnhance"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="✨ Enhance"
+                android:text="✨ Enhance Text"
                 android:textSize="12sp"
-                android:layout_marginEnd="8dp"
+                android:layout_marginBottom="16dp"
                 android:background="@drawable/enhanced_action_button"
                 android:textColor="@android:color/white" />
 
-            <Button
-                android:id="@+id/btnCopy"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:text="📋"
-                android:textSize="16sp"
-                android:layout_marginEnd="8dp"
-                android:enabled="false"
-                android:background="@drawable/disabled_action_button"
-                android:textColor="@color/text_secondary" />
-
-            <Button
-                android:id="@+id/btnReplace"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:text="🔄"
-                android:textSize="16sp"
-                android:layout_marginEnd="8dp"
-                android:enabled="false"
-                android:background="@drawable/disabled_action_button"
-                android:textColor="@color/text_secondary" />
-
-            <Button
-                android:id="@+id/btnClose"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:text="✕"
-                android:textSize="16sp"
-                android:background="@drawable/close_button_background"
-                android:textColor="@android:color/white" />
-
-        </LinearLayout>
-
-        <!-- Status/Progress indicator -->
-        <LinearLayout
-            android:id="@+id/progressContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:visibility="gone">
-
-            <ProgressBar
-                android:id="@+id/progressBar"
-                style="?android:attr/progressBarStyleSmall"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_marginEnd="8dp" />
-
-            <TextView
-                android:id="@+id/tvStatus"
-                android:layout_width="wrap_content"
+            <!-- Enhanced Text Result Section (Initially Hidden) -->
+            <LinearLayout
+                android:id="@+id/enhancedResultSection"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Processing..."
-                android:textSize="10sp"
-                android:textColor="@color/text_secondary" />
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Enhanced Result"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_primary"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvTransformedText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Enhanced text will appear here"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_primary"
+                    android:maxLines="8"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="16dp"
+                    android:background="#F0F8FF"
+                    android:padding="12dp"
+                    android:textIsSelectable="true"
+                    android:minHeight="80dp"
+                    android:gravity="top"
+                    android:lineSpacingExtra="2dp" />
+
+                <!-- Action Buttons for Enhanced Text -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <Button
+                        android:id="@+id/btnCopy"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="📋 Copy"
+                        android:textSize="12sp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/enhanced_action_button"
+                        android:textColor="@android:color/white" />
+
+                    <Button
+                        android:id="@+id/btnReplace"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="🔄 Replace"
+                        android:textSize="12sp"
+                        android:background="@drawable/enhanced_action_button"
+                        android:textColor="@android:color/white" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Status/Progress indicator -->
+            <LinearLayout
+                android:id="@+id/progressContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/tvStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Processing..."
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
         </LinearLayout>
 
-    </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
-</androidx.cardview.widget.CardView>
+</FrameLayout>
