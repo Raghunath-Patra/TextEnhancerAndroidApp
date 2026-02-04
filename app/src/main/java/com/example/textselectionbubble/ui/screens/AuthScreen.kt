@@ -1,4 +1,4 @@
-// ui/screens/AuthScreen.kt (Updated with connectivity)
+// ui/screens/AuthScreen.kt
 package com.example.textselectionbubble.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -12,7 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -23,19 +22,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.textselectionbubble.ui.components.ConnectivityStatusBar
-import com.example.textselectionbubble.ui.components.ConnectivityIndicator
-import com.example.textselectionbubble.ui.components.NoInternetDialog
 import com.example.textselectionbubble.ui.components.rememberConnectivityState
 import com.example.textselectionbubble.viewmodel.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewModel()) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val connectivityState = rememberConnectivityState()
     var passwordVisible by remember { mutableStateOf(false) }
-    var showNoInternetDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isSuccess && !uiState.isSignUp) {
         if (uiState.isSuccess && !uiState.isSignUp) {
@@ -45,18 +40,10 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
         }
     }
 
-    // Show no internet dialog when trying to authenticate without connection
-    LaunchedEffect(uiState.errorMessage) {
-        if (uiState.errorMessage.contains("network", ignoreCase = true) ||
-            uiState.errorMessage.contains("connection", ignoreCase = true)) {
-            showNoInternetDialog = true
-        }
-    }
-
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Connectivity Status Bar
+        // Offline notification banner
         ConnectivityStatusBar()
 
         Column(
@@ -69,7 +56,7 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
             // App Title
             Text(
                 text = "Text Selection Bubble",
-                fontSize = 28.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.primary
@@ -77,46 +64,20 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Enhance your text with AI",
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                ConnectivityIndicator(showLabel = false)
-            }
+            Text(
+                text = "Enhance your text with AI",
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Internet requirement notice
-            if (!connectivityState.isConnected) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
-                ) {
-                    Text(
-                        text = "⚠️ Internet connection required for authentication",
-                        modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+            Spacer(modifier = Modifier.height(48.dp))
 
             // Auth Mode Title
             Text(
                 text = if (uiState.isSignUp) "Create Account" else "Welcome Back",
                 fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
+                fontWeight = FontWeight.SemiBold
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -130,7 +91,7 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true,
-                enabled = !uiState.isLoading && connectivityState.isConnected
+                enabled = !uiState.isLoading
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -153,7 +114,7 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
-                enabled = !uiState.isLoading && connectivityState.isConnected
+                enabled = !uiState.isLoading
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -162,7 +123,7 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
             Button(
                 onClick = {
                     if (!connectivityState.isConnected) {
-                        showNoInternetDialog = true
+                        viewModel.authenticate { }
                     } else {
                         viewModel.authenticate {
                             navController.navigate("main") {
@@ -171,44 +132,41 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isLoading && connectivityState.isConnected
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                enabled = !uiState.isLoading
             ) {
                 if (uiState.isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                 }
                 Text(
-                    text = if (!connectivityState.isConnected) "No Internet Connection"
-                    else if (uiState.isSignUp) "Create Account"
-                    else "Sign In",
+                    text = if (uiState.isSignUp) "Create Account" else "Sign In",
                     fontSize = 16.sp
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Toggle Auth Mode Button
+            // Toggle Auth Mode
             TextButton(
                 onClick = viewModel::toggleMode,
-                enabled = !uiState.isLoading && connectivityState.isConnected
+                enabled = !uiState.isLoading
             ) {
                 Text(
                     text = if (uiState.isSignUp)
                         "Already have an account? Sign in"
                     else
-                        "Don't have an account? Sign up",
-                    color = if (connectivityState.isConnected)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        "Don't have an account? Sign up"
                 )
             }
 
-            // Email Verification Status
+            // Email Verification Notice
             if (uiState.needsEmailVerification) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Card(
@@ -221,33 +179,23 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Email Verification Required",
-                            fontWeight = FontWeight.Medium,
+                            text = "Verify Your Email",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "We've sent a verification link to your email. Please click the link to activate your account, then return here to sign in.",
+                            text = "Check your email for a verification link. Click it to activate your account, then sign in here.",
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         TextButton(
-                            onClick = {
-                                if (!connectivityState.isConnected) {
-                                    showNoInternetDialog = true
-                                } else {
-                                    viewModel.resendVerificationEmail()
-                                }
-                            },
+                            onClick = { viewModel.resendVerificationEmail() },
                             enabled = !uiState.isLoading && connectivityState.isConnected
                         ) {
-                            Text(
-                                text = if (connectivityState.isConnected)
-                                    "Resend Verification Email"
-                                else
-                                    "No Internet Connection"
-                            )
+                            Text("Resend Verification Email")
                         }
                     }
                 }
@@ -259,38 +207,26 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
+                        containerColor = if (uiState.errorMessage.contains("successfully"))
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.errorContainer
                     )
                 ) {
                     Text(
                         text = uiState.errorMessage,
                         modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        color = if (uiState.errorMessage.contains("successfully"))
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onErrorContainer,
                         textAlign = TextAlign.Center
                     )
                 }
             }
 
-            // Success Message for Sign Up
-            if (uiState.isSuccess && uiState.errorMessage.isNotEmpty() && uiState.errorMessage.contains("successfully")) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Text(
-                        text = uiState.errorMessage,
-                        modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            // Forgot Password Option
-            if (!uiState.isSignUp && connectivityState.isConnected) {
+            // Forgot Password
+            if (!uiState.isSignUp) {
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(
                     onClick = { viewModel.forgotPassword() },
@@ -298,28 +234,10 @@ fun AuthScreen(navController: NavController, viewModel: AuthViewModel = viewMode
                 ) {
                     Text(
                         text = "Forgot Password?",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.secondary
+                        fontSize = 14.sp
                     )
                 }
             }
         }
-    }
-
-    // No Internet Dialog
-    if (showNoInternetDialog) {
-        NoInternetDialog(
-            onDismiss = { showNoInternetDialog = false },
-            onRetry = {
-                showNoInternetDialog = false
-                if (connectivityState.isConnected) {
-                    viewModel.authenticate {
-                        navController.navigate("main") {
-                            popUpTo("auth") { inclusive = true }
-                        }
-                    }
-                }
-            }
-        )
     }
 }
